@@ -14,6 +14,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.
 - **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
+- **Layout warning:** if YouTube changes its page structure so videos or watched bars are no longer recognized, settings shows a warning.
 - **Backup:** export all settings, lists and manually hidden videos to a JSON file, and import them on another computer.
 - **Keyboard:** <kbd>H</kbd> hides the video under the mouse (keep pressing to clear the videos that slide into its place; on a grayed-out video, H brings it back), <kbd>P</kbd> peeks at everything hidden (outlined, with a bar to exit). Can be switched off in settings.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
@@ -63,4 +64,6 @@ When a push to `main` carries a version that has no release yet, it tags `v<vers
 GitHub Release with the zip attached. Pushing a version bump is all it takes to release.
 
 ## Maintenance
-YouTube changes its markup often. If filtering stops working, update the `SEL` selectors at the top of `content.js`.
+YouTube changes its markup often. A few seconds after each video page loads, the extension checks whether its
+selectors still match (videos, watched-progress bars, the settings button) and shows a warning at the top of
+the settings panel if not. To fix, update the `SEL` selectors at the top of `content.js`.

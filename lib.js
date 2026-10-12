@@ -25,7 +25,8 @@ const DEFAULTS = {
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
-const LOCAL_DEFAULTS = { manuallyHidden: {} };
+// health: last layout check from content.js, { problems: string[], page, checkedAt }.
+const LOCAL_DEFAULTS = { manuallyHidden: {}, health: { problems: [] } };
 const MANUAL_TTL_MS = 48 * 60 * 60 * 1000;
 
 // v0.5.0 stored a plain array of ids; treat those as hidden now.
@@ -141,6 +142,19 @@ function videoTypes({ badgeClasses = [], badgeTexts = [], overlayStyles = [], me
   return types;
 }
 
+const MIN_LINKS_FOR_HEALTH = 6;
+
+// Signs that YouTube's markup no longer matches our selectors, from counts content.js takes on a settled page.
+// Returns problem codes: "cards" (videos shown but none recognized), "progress" (progress-like bars on cards
+// but none matching the watched-bar selector), "masthead" (settings button couldn't be placed).
+function assessHealth({ videoLinks, cards, progressLike, progressMatched, mastheadFound }) {
+  const problems = [];
+  if (videoLinks >= MIN_LINKS_FOR_HEALTH && cards === 0) problems.push("cards");
+  if (progressLike > 0 && progressMatched === 0) problems.push("progress");
+  if (!mastheadFound) problems.push("masthead");
+  return problems;
+}
+
 const BACKUP_APP = "youtube-watched-hider";
 const MAX_LIST_ITEMS = 500;
 const MAX_LINE_LENGTH = 200;
@@ -242,5 +256,6 @@ if (typeof module !== "undefined") {
     videoTypes,
     makeBackup,
     sanitizeBackup,
+    assessHealth,
   };
 }

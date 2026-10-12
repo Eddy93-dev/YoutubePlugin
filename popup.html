@@ -26,12 +26,20 @@
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
     .warn { color: var(--warn); }
+    .alert { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; font-size: 13px; }
+    .alert ul { margin: 4px 0; padding-left: 18px; }
+    .alert a { color: inherit; }
     kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; font: 11px ui-monospace, monospace; }
     footer { text-align: right; }
   </style>
 </head>
 <body>
   <h1>YouTube Watched Hider</h1>
+  <div class="alert" id="healthAlert" role="alert" hidden>
+    <strong>YouTube's layout seems to have changed.</strong>
+    <ul id="healthProblems"></ul>
+    <a href="https://github.com/Eddy93-dev/YoutubePlugin/issues" target="_blank" rel="noopener">Report it or check for an update</a>
+  </div>
   <form id="form">
     <fieldset>
       <legend>Filtered videos</legend>

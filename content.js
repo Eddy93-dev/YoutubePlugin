@@ -12,6 +12,8 @@ const SEL = {
   ageText: ".ytContentMetadataViewModelMetadataText, #metadata-line span, .inline-metadata-item",
   badge: "badge-shape, .badge, ytd-badge-supported-renderer .badge",
   anyVideoLink: 'a[href^="/watch?"], a[href^="/playlist?"]',
+  // Anything on a card that looks like a sized progress bar; used only to notice when SEL.progress stops matching.
+  progressLike: '[class*="rogress"][style*="width"], [id*="rogress"][style*="width"]',
   shortsBlocks:
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]), " +
     'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
@@ -27,6 +29,7 @@ const MAX_PER_ROW = 10;
 const HIDE_BTN_CLASS = "yth-hide-btn";
 const TOAST_ID = "yth-toast";
 const PEEK_BAR_ID = "yth-peek-bar";
+const HEALTH_DELAY_MS = 5000;
 const TOAST_MS = 5000;
 // Past this many changed subtrees in one frame (initial load, big re-render), one full pass is cheaper.
 const FULL_PASS_THRESHOLD = 200;
@@ -44,6 +47,8 @@ let fullPassPending = false;
 const pendingRoots = new Set();
 let expiryTimer;
 let pointer = null;
+let healthTimer;
+let lastHealthKey = null;
 let peeking = false;
 
 // Prefer the outer grid cell: hiding only the inner lockup leaves an empty box and the grid can't reflow.
@@ -336,6 +341,33 @@ function applyGridSize() {
   }
 }
 
+// Layout check: a few seconds after a video page settles, look for signs that YouTube's markup no longer
+// matches our selectors, and record the result for the settings panel (only when it changes).
+function scheduleHealthCheck() {
+  clearTimeout(healthTimer);
+  healthTimer = setTimeout(checkHealth, HEALTH_DELAY_MS);
+}
+
+function checkHealth() {
+  const page = pageKey(location.pathname);
+  if (!page || !chrome.runtime?.id) return;
+  const main = document.querySelector("ytd-page-manager") ?? document.body;
+  const cards = [...cardsIn(main)];
+  const problems = assessHealth({
+    videoLinks: main.querySelectorAll('a[href^="/watch?v="]').length,
+    cards: cards.length,
+    progressLike: cards.filter((c) => c.querySelector(SEL.progressLike)).length,
+    progressMatched: cards.filter((c) => c.querySelector(SEL.progress)).length,
+    mastheadFound: Boolean(document.getElementById(BUTTON_ID)),
+  });
+  const key = problems.join(",");
+  if (key === lastHealthKey) return;
+  lastHealthKey = key;
+  chrome.storage.local.set({ health: { problems, page, checkedAt: Date.now() } }).catch((err) => {
+    console.warn("YouTube Watched Hider: couldn't save layout check", err);
+  });
+}
+
 // Page-wide CSS switches on <html>: which page this is, and the Home clean-up toggles (pure CSS in content.css).
 function applyPageFlags() {
   const root = document.documentElement;
@@ -450,7 +482,11 @@ document.addEventListener(
   { capture: true, passive: true },
 );
 
-document.addEventListener("yt-navigate-finish", scheduleFullPass);
+document.addEventListener("yt-navigate-finish", () => {
+  scheduleFullPass();
+  scheduleHealthCheck();
+});
+scheduleHealthCheck();
 // href: YouTube recycles card elements by swapping links in place. style: progress bar widths update in place.
 // Our own changes are class / d / aria attributes, which aren't observed, so we don't retrigger ourselves.
 new MutationObserver(onMutations).observe(document.documentElement, {

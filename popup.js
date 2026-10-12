@@ -64,14 +64,43 @@ chrome.commands.getAll((commands) => {
     : "Set a toggle shortcut at chrome://extensions/shortcuts.";
 });
 
+const PAGE_NAMES = {
+  filterSubscriptions: "Subscriptions",
+  filterHome: "Home",
+  filterSearch: "search results",
+  filterWatch: "the watch page",
+  filterChannel: "channel pages",
+};
+const HEALTH_MESSAGES = {
+  cards: (page) => `Videos on ${page} weren't recognized, so nothing there can be filtered.`,
+  progress: () => "Watched-progress bars weren't recognized, so watched videos won't be hidden.",
+  masthead: () => "The settings button couldn't be added next to the search bar.",
+};
+
+function renderHealth(health) {
+  const problems = (health?.problems ?? []).filter((p) => HEALTH_MESSAGES[p]);
+  document.getElementById("healthAlert").hidden = problems.length === 0;
+  document.getElementById("healthProblems").replaceChildren(
+    ...problems.map((p) => {
+      const item = document.createElement("li");
+      item.textContent = HEALTH_MESSAGES[p](PAGE_NAMES[health.page] ?? "this page");
+      return item;
+    }),
+  );
+}
+
 chrome.storage.local.get(LOCAL_DEFAULTS, (s) => {
   manualHidden = normalizeHidden(s.manuallyHidden, Date.now());
+  renderHealth(s.health);
   render();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes.manuallyHidden) return;
-  manualHidden = normalizeHidden(changes.manuallyHidden.newValue, Date.now());
-  render();
+  if (area !== "local") return;
+  if (changes.health) renderHealth(changes.health.newValue);
+  if (changes.manuallyHidden) {
+    manualHidden = normalizeHidden(changes.manuallyHidden.newValue, Date.now());
+    render();
+  }
 });
 
 document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
@@ -88,7 +117,7 @@ if (view === "tab") document.body.classList.add("tab-view");
 document.getElementById("exportBtn").addEventListener("click", async () => {
   try {
     const [settings, local] = await Promise.all([chrome.storage.sync.get(DEFAULTS), chrome.storage.local.get(LOCAL_DEFAULTS)]);
-    const backup = makeBackup(settings, local, chrome.runtime.getManifest().version, Date.now());
+    const backup = makeBackup(settings, { manuallyHidden: local.manuallyHidden }, chrome.runtime.getManifest().version, Date.now());
     const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;

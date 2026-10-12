@@ -1,6 +1,18 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth } = require("../lib.js");
+
+test("assessHealth reports nothing on a healthy page", () => {
+  assert.deepStrictEqual(assessHealth({ videoLinks: 60, cards: 30, progressLike: 4, progressMatched: 4, mastheadFound: true }), []);
+  // Few links (e.g. an empty feed) is not evidence of breakage.
+  assert.deepStrictEqual(assessHealth({ videoLinks: 2, cards: 0, progressLike: 0, progressMatched: 0, mastheadFound: true }), []);
+});
+
+test("assessHealth flags unrecognized cards, progress bars and masthead", () => {
+  assert.deepStrictEqual(assessHealth({ videoLinks: 40, cards: 0, progressLike: 0, progressMatched: 0, mastheadFound: true }), ["cards"]);
+  assert.deepStrictEqual(assessHealth({ videoLinks: 40, cards: 20, progressLike: 3, progressMatched: 0, mastheadFound: true }), ["progress"]);
+  assert.deepStrictEqual(assessHealth({ videoLinks: 40, cards: 20, progressLike: 0, progressMatched: 0, mastheadFound: false }), ["masthead"]);
+});
 
 test("backup round-trips settings and manual hides", () => {
   const settings = { ...DEFAULTS, threshold: 65, mode: "dim", blockedKeywords: ["reaction"] };
