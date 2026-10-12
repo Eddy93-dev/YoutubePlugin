@@ -7,6 +7,7 @@ const DEFAULTS = {
   filterHome: true,
   filterSearch: true,
   filterWatch: true,
+  filterChannel: true,
   allowedChannels: [],
   hideShorts: false,
   tilesPerRow: 0, // 0 = YouTube's default
@@ -57,12 +58,16 @@ function shouldFilter(percent, threshold) {
   return percent !== null && percent >= threshold;
 }
 
+// "/@name", "/channel/UC…", "/c/name", "/user/name", optionally followed by a tab such as "/videos".
+const CHANNEL_PATH = /^\/(@[^/]+|(channel|c|user)\/[^/]+)(\/|$)/;
+
 // Settings key of the page toggle that governs this path, or null if the watched filter never runs here.
 function pageKey(pathname) {
   if (pathname.startsWith("/feed/subscriptions")) return "filterSubscriptions";
   if (pathname === "/") return "filterHome";
   if (pathname === "/results") return "filterSearch";
   if (pathname === "/watch") return "filterWatch";
+  if (CHANNEL_PATH.test(pathname)) return "filterChannel";
   return null;
 }
 

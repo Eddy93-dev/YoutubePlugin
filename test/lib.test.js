@@ -49,7 +49,15 @@ test("pageKey maps paths to page toggles", () => {
   assert.strictEqual(pageKey("/results"), "filterSearch");
   assert.strictEqual(pageKey("/watch"), "filterWatch");
   assert.strictEqual(pageKey("/feed/history"), null);
-  assert.strictEqual(pageKey("/@someone"), null);
+  assert.strictEqual(pageKey("/playlist"), null);
+});
+
+test("pageKey recognizes channel pages and their tabs", () => {
+  for (const path of ["/@someone", "/@someone/videos", "/@some.one/streams", "/channel/UCabc", "/channel/UCabc/videos", "/c/Name", "/user/name/videos"]) {
+    assert.strictEqual(pageKey(path), "filterChannel", path);
+  }
+  assert.strictEqual(pageKey("/channel"), null);
+  assert.strictEqual(pageKey("/c"), null);
 });
 
 test("channelKey extracts handles and channel ids", () => {

@@ -6,6 +6,7 @@ const CHECKBOXES = [
   "filterHome",
   "filterSearch",
   "filterWatch",
+  "filterChannel",
   "hideShorts",
   "manualEnabled",
 ];
