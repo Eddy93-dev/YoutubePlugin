@@ -1,6 +1,34 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats } = require("../lib.js");
+
+test("dayKey gives local calendar days, counting back across month ends", () => {
+  const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
+  assert.strictEqual(dayKey(now), "2026-03-01");
+  assert.strictEqual(dayKey(now, 1), "2026-02-28");
+  assert.strictEqual(dayKey(now, 29), "2026-01-31");
+});
+
+test("mergeStats adds today's batch, keeps the first reason, and drops days past 30", () => {
+  const now = new Date(2026, 9, 12, 12).getTime();
+  const old = { days: { "2026-09-01": { aaaaaaaaaaa: "watched" }, "2026-10-12": { bbbbbbbbbbb: "manual" } } };
+  const merged = mergeStats(old, new Map([["bbbbbbbbbbb", "keyword"], ["ccccccccccc", "age"]]), now);
+  assert.deepStrictEqual(merged, { days: { "2026-10-12": { bbbbbbbbbbb: "manual", ccccccccccc: "age" } } });
+  assert.deepStrictEqual(mergeStats(undefined, new Map([["ddddddddddd", "shorts"]]), now), { days: { "2026-10-12": { ddddddddddd: "shorts" } } });
+});
+
+test("summarizeStats counts unique videos per window and by reason", () => {
+  const now = new Date(2026, 9, 12, 12).getTime();
+  const stats = {
+    days: {
+      "2026-10-12": { a: "watched", b: "manual" },
+      "2026-10-10": { a: "watched", c: "keyword" }, // a seen again: counted once
+      "2026-09-20": { d: "age" }, // within 30 days, outside 7
+    },
+  };
+  assert.deepStrictEqual(summarizeStats(stats, now), { today: 2, week: 3, month: 4, byReason: { watched: 1, manual: 1, keyword: 1, age: 1 } });
+  assert.deepStrictEqual(summarizeStats(undefined, now), { today: 0, week: 0, month: 0, byReason: {} });
+});
 
 test("assessHealth reports nothing on a healthy page", () => {
   assert.deepStrictEqual(assessHealth({ videoLinks: 60, cards: 30, progressLike: 4, progressMatched: 4, mastheadFound: true }), []);

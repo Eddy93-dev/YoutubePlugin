@@ -26,7 +26,8 @@ const DEFAULTS = {
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
 // health: last layout check from content.js, { problems: string[], page, checkedAt }.
-const LOCAL_DEFAULTS = { manuallyHidden: {}, health: { problems: [] } };
+// stats: per-day filtered videos for the settings panel, see mergeStats.
+const LOCAL_DEFAULTS = { manuallyHidden: {}, health: { problems: [] }, stats: { days: {} } };
 const MANUAL_TTL_MS = 48 * 60 * 60 * 1000;
 
 // v0.5.0 stored a plain array of ids; treat those as hidden now.
@@ -140,6 +141,42 @@ function videoTypes({ badgeClasses = [], badgeTexts = [], overlayStyles = [], me
   }
   if (hrefs.some((h) => /[?&]list=/.test(h))) types.push("playlist");
   return types;
+}
+
+const STATS_DAYS = 30;
+
+// Local calendar day "YYYY-MM-DD", optionally `daysAgo` days back (setDate handles DST-length days).
+function dayKey(now, daysAgo = 0) {
+  const d = new Date(now);
+  d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// stats = { days: { "YYYY-MM-DD": { videoId: reason } } }. Adds today's batch (first reason seen wins)
+// and drops days older than STATS_DAYS.
+function mergeStats(stats, batch, now) {
+  const today = dayKey(now);
+  const cutoff = dayKey(now, STATS_DAYS - 1);
+  const days = Object.fromEntries(Object.entries(stats?.days ?? {}).filter(([day]) => day >= cutoff));
+  const todays = { ...days[today] };
+  for (const [id, reason] of batch) if (!(id in todays)) todays[id] = reason;
+  return { days: { ...days, [today]: todays } };
+}
+
+// Unique videos filtered today / last 7 days / last 30 days, plus the 30-day count per reason.
+function summarizeStats(stats, now) {
+  const days = stats?.days ?? {};
+  const uniqueOver = (n) => {
+    const seen = new Map();
+    for (let i = 0; i < n; i++) {
+      for (const [id, reason] of Object.entries(days[dayKey(now, i)] ?? {})) if (!seen.has(id)) seen.set(id, reason);
+    }
+    return seen;
+  };
+  const month = uniqueOver(STATS_DAYS);
+  const byReason = {};
+  for (const reason of month.values()) byReason[reason] = (byReason[reason] ?? 0) + 1;
+  return { today: uniqueOver(1).size, week: uniqueOver(7).size, month: month.size, byReason };
 }
 
 const MIN_LINKS_FOR_HEALTH = 6;
@@ -257,5 +294,8 @@ if (typeof module !== "undefined") {
     makeBackup,
     sanitizeBackup,
     assessHealth,
+    dayKey,
+    mergeStats,
+    summarizeStats,
   };
 }

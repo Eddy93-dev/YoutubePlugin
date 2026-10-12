@@ -89,14 +89,36 @@ function renderHealth(health) {
   );
 }
 
+const REASON_LABELS = {
+  watched: "watched",
+  manual: "hidden by you",
+  keyword: "keyword",
+  channel: "blocked channel",
+  age: "too old",
+  type: "video type",
+  shorts: "Shorts",
+};
+
+function renderStats(stats) {
+  const { today, week, month, byReason } = summarizeStats(stats, Date.now());
+  document.getElementById("statsSummary").textContent =
+    month === 0 ? "Nothing filtered yet." : `Filtered today: ${today} · 7 days: ${week} · 30 days: ${month}`;
+  const parts = Object.entries(byReason)
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, n]) => `${REASON_LABELS[reason] ?? reason} ${n}`);
+  document.getElementById("statsReasons").textContent = parts.length ? `Last 30 days by reason: ${parts.join(", ")}` : "";
+}
+
 chrome.storage.local.get(LOCAL_DEFAULTS, (s) => {
   manualHidden = normalizeHidden(s.manuallyHidden, Date.now());
   renderHealth(s.health);
+  renderStats(s.stats);
   render();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.health) renderHealth(changes.health.newValue);
+  if (changes.stats) renderStats(changes.stats.newValue);
   if (changes.manuallyHidden) {
     manualHidden = normalizeHidden(changes.manuallyHidden.newValue, Date.now());
     render();

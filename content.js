@@ -30,6 +30,7 @@ const HIDE_BTN_CLASS = "yth-hide-btn";
 const TOAST_ID = "yth-toast";
 const PEEK_BAR_ID = "yth-peek-bar";
 const HEALTH_DELAY_MS = 5000;
+const STATS_FLUSH_MS = 10000;
 const TOAST_MS = 5000;
 // Past this many changed subtrees in one frame (initial load, big re-render), one full pass is cheaper.
 const FULL_PASS_THRESHOLD = 200;
@@ -49,6 +50,10 @@ let expiryTimer;
 let pointer = null;
 let healthTimer;
 let lastHealthKey = null;
+const pendingStats = new Map(); // videoId → reason, not yet written
+const recordedToday = new Set(); // videoIds already counted today in this tab
+let statsDay = null;
+let statsTimer = null;
 let peeking = false;
 
 // Prefer the outer grid cell: hiding only the inner lockup leaves an empty box and the grid can't reflow.
@@ -114,21 +119,22 @@ function cardTitle(card) {
   return card.querySelector(SEL.title)?.textContent.trim() ?? "";
 }
 
-// Watched, blocked-channel and keyword filters. The "never hide" list overrides all of them.
-function autoFiltered(card, ctx) {
+// Why an automatic filter applies to this card ("watched", "channel", "keyword", "age", "type"), or null.
+// The "never hide" list overrides all of them.
+function autoFilterReason(card, ctx) {
   const channelIds = ctx.usesChannelLists ? cardChannelIds(card) : [];
-  if (channelInList(settings.allowedChannels, channelIds)) return false;
-  return (
-    (ctx.watchedActive && isWatched(card)) ||
-    // Not on channel pages: opening a blocked channel's page is deliberate, and hiding every card there
-    // makes YouTube keep loading more to fill the screen.
-    (!ctx.onChannelPage && channelInList(settings.blockedChannels, channelIds)) ||
-    ctx.matchesKeyword(cardTitle(card)) ||
-    // Age and type filters skip channel pages too: hiding most of a channel's uploads (older ones, its
-    // live tab) would make YouTube page through the whole back catalog.
-    (!ctx.onChannelPage && ctx.maxAgeDays > 0 && cardAgeDays(card) > ctx.maxAgeDays) ||
-    (!ctx.onChannelPage && ctx.hiddenTypes.size > 0 && cardTypes(card).some((t) => ctx.hiddenTypes.has(t)))
-  );
+  if (channelInList(settings.allowedChannels, channelIds)) return null;
+  if (ctx.watchedActive && isWatched(card)) return "watched";
+  // Not on channel pages: opening a blocked channel's page is deliberate, and hiding every card there
+  // makes YouTube keep loading more to fill the screen.
+  if (!ctx.onChannelPage && channelInList(settings.blockedChannels, channelIds)) return "channel";
+  if (ctx.matchesKeyword(cardTitle(card))) return "keyword";
+  // Age and type filters skip channel pages too: hiding most of a channel's uploads (older ones, its
+  // live tab) would make YouTube page through the whole back catalog.
+  if (ctx.onChannelPage) return null;
+  if (ctx.maxAgeDays > 0 && cardAgeDays(card) > ctx.maxAgeDays) return "age";
+  if (ctx.hiddenTypes.size > 0 && cardTypes(card).some((t) => ctx.hiddenTypes.has(t))) return "type";
+  return null;
 }
 
 function makeHideButton() {
@@ -171,10 +177,45 @@ function syncHideButton(card, isManual) {
 // Decides one card's state from scratch. ctx holds values that are the same for every card in a pass.
 function processCard(card, ctx) {
   card.classList.remove(...CLASSES);
-  const isManual = settings.manualEnabled && ctx.manualIds.has(cardVideoId(card));
+  const id = cardVideoId(card);
+  const isManual = settings.manualEnabled && ctx.manualIds.has(id);
   syncHideButton(card, isManual);
-  if (settings.hideShorts && card.querySelector(SEL.shortsLink)) card.classList.add("yth-hidden");
-  else if (isManual || autoFiltered(card, ctx)) card.classList.add(ctx.cls);
+  if (settings.hideShorts && card.querySelector(SEL.shortsLink)) {
+    card.classList.add("yth-hidden");
+    recordStat(id, "shorts");
+    return;
+  }
+  const reason = isManual ? "manual" : autoFilterReason(card, ctx);
+  if (!reason) return;
+  card.classList.add(ctx.cls);
+  recordStat(id, reason);
+}
+
+// Stats: remember each filtered video once per day with its reason, and write in batches.
+function recordStat(id, reason) {
+  if (!id) return;
+  const today = dayKey(Date.now());
+  if (today !== statsDay) {
+    statsDay = today;
+    recordedToday.clear();
+  }
+  if (recordedToday.has(id)) return;
+  recordedToday.add(id);
+  pendingStats.set(id, reason);
+  statsTimer ??= setTimeout(flushStats, STATS_FLUSH_MS);
+}
+
+async function flushStats() {
+  statsTimer = null;
+  if (!pendingStats.size || !chrome.runtime?.id) return;
+  const batch = new Map(pendingStats);
+  pendingStats.clear();
+  try {
+    const { stats } = await chrome.storage.local.get(LOCAL_DEFAULTS);
+    await chrome.storage.local.set({ stats: mergeStats(stats, batch, Date.now()) });
+  } catch (err) {
+    console.warn("YouTube Watched Hider: couldn't save stats", err);
+  }
 }
 
 // Cards at or inside root (inner lockups collapse into their grid cell).
@@ -487,6 +528,10 @@ document.addEventListener("yt-navigate-finish", () => {
   scheduleHealthCheck();
 });
 scheduleHealthCheck();
+// Write any pending stats when the tab is hidden or closed, instead of waiting for the timer.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushStats();
+});
 // href: YouTube recycles card elements by swapping links in place. style: progress bar widths update in place.
 // Our own changes are class / d / aria attributes, which aren't observed, so we don't retrigger ourselves.
 new MutationObserver(onMutations).observe(document.documentElement, {
