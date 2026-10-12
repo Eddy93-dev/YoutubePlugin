@@ -26,12 +26,12 @@ Open the settings from the toolbar icon or the button next to YouTube's search b
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/settings-light.png" width="300" alt="Settings panel in light theme: watched videos hidden at 80% on all pages, 3 manually hidden videos, YouTube's default layout"></td>
-    <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: watched videos grayed out at 60%, search results excluded, one channel never hidden, 5 videos per row, Shorts hidden"></td>
+    <td align="center"><img src="docs/screenshots/settings-light.png" width="300" alt="Settings panel in light theme with default settings: hide anything watched past 80% on all pages, no extra filters, stats for the last 30 days"></td>
+    <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, hide upcoming and playlists, Home clean-up on, 5 videos per row, Shorts hidden"></td>
   </tr>
   <tr>
     <td align="center">Defaults: hide anything watched past 80%</td>
-    <td align="center">Gray out at 60%, keep a favorite channel, 5 per row, no Shorts</td>
+    <td align="center">Power setup: gray out at 60%, keyword, channel, age and type filters, Home clean-up, 5 per row, no Shorts</td>
   </tr>
 </table>
 
