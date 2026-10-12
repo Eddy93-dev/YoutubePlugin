@@ -1,0 +1,9 @@
+{
+  "name": "youtube-watched-hider",
+  "private": true,
+  "scripts": {
+    "test": "node --test",
+    "icons": "node scripts/make-icons.js",
+    "pack": "pwsh -NoProfile -File scripts/pack.ps1"
+  }
+}

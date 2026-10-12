@@ -1,0 +1,3 @@
+.yth-hidden { display: none !important; }
+.yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
+.yth-dimmed:hover { opacity: 1; filter: none; }
