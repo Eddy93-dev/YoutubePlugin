@@ -14,6 +14,8 @@ const CHECKBOXES = [
   "hideUpcoming",
   "hideMembers",
   "hidePlaylists",
+  "hideHomeShelves",
+  "hideSponsored",
 ];
 const manualCount = document.getElementById("manualCount");
 const keywordErrors = document.getElementById("keywordErrors");

@@ -336,10 +336,20 @@ function applyGridSize() {
   }
 }
 
+// Page-wide CSS switches on <html>: which page this is, and the Home clean-up toggles (pure CSS in content.css).
+function applyPageFlags() {
+  const root = document.documentElement;
+  const page = pageKey(location.pathname) ?? "";
+  if (root.dataset.ythPage !== page) root.dataset.ythPage = page;
+  root.toggleAttribute("data-yth-hide-shelves", Boolean(settings.hideHomeShelves));
+  root.toggleAttribute("data-yth-hide-sponsored", Boolean(settings.hideSponsored));
+}
+
 // Full pass after settings, storage, navigation or expiry changes; otherwise only the subtrees that changed.
 function run() {
   scheduled = false;
   ensureSettingsButton();
+  applyPageFlags();
   if (settings.hideShorts && location.pathname.startsWith("/shorts/")) {
     location.replace("/");
     return;

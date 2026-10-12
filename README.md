@@ -10,6 +10,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Channel blocklist:** always hide videos from channels you list (by `@handle` or name).
 - **Never hide:** channels you list are never hidden by any automatic filter.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
+- **Home clean-up:** hide Home's add-on shelves (news, trending, posts, Playables, Shorts…) and sponsored tiles and banners.
 - **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.
 - **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.

@@ -20,6 +20,8 @@ const DEFAULTS = {
   hideUpcoming: false,
   hideMembers: false,
   hidePlaylists: false,
+  hideHomeShelves: false,
+  hideSponsored: false,
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.

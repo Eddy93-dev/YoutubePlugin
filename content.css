@@ -37,6 +37,22 @@ html[data-yth-peek] :is(.yth-hidden, .yth-dimmed) {
 }
 #yth-peek-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
+/* Home clean-up. Every rich section on Home is an injected shelf (news, trending, posts, Playables, Shorts…). */
+html[data-yth-hide-shelves][data-yth-page="filterHome"] ytd-rich-section-renderer { display: none !important; }
+/* Sponsored tiles and banners, on every page. */
+html[data-yth-hide-sponsored] :is(
+  ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+  ytd-ad-slot-renderer,
+  ytd-in-feed-ad-layout-renderer,
+  ytd-promoted-sparkles-web-renderer,
+  ytd-promoted-video-renderer,
+  ytd-search-pyv-renderer,
+  ytd-banner-promo-renderer,
+  ytd-statement-banner-renderer,
+  ytd-rich-section-renderer:has(ytd-statement-banner-renderer, ytd-banner-promo-renderer),
+  #masthead-ad
+) { display: none !important; }
+
 /* YouTube zeroes the left margin of tiles it marks is-in-first-column, using its own per-row count and DOM order.
    Once tiles are hidden or per-row changes, that mark lands mid-row and rows go jagged.
    Tile width is 100%/n - margin, so a uniform right margin fills each row exactly. */
