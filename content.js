@@ -21,6 +21,7 @@ const MIN_PER_ROW = 2;
 const MAX_PER_ROW = 10;
 const HIDE_BTN_CLASS = "yth-hide-btn";
 const TOAST_ID = "yth-toast";
+const PEEK_BAR_ID = "yth-peek-bar";
 const TOAST_MS = 5000;
 // Past this many changed subtrees in one frame (initial load, big re-render), one full pass is cheaper.
 const FULL_PASS_THRESHOLD = 200;
@@ -37,6 +38,8 @@ let scheduled = false;
 let fullPassPending = false;
 const pendingRoots = new Set();
 let expiryTimer;
+let pointer = null;
+let peeking = false;
 
 // Prefer the outer grid cell: hiding only the inner lockup leaves an empty box and the grid can't reflow.
 function findCard(el) {
@@ -212,13 +215,9 @@ function showUndoToast(id) {
   setTimeout(() => toast.remove(), TOAST_MS);
 }
 
-function onHideClick(e) {
-  const button = e.target.closest?.(`.${HIDE_BTN_CLASS}`);
-  if (!button) return;
-  // Cards are links; don't open the video.
-  e.preventDefault();
-  e.stopPropagation();
-  // Read the id at click time: YouTube recycles card elements for different videos.
+// Hides the button's video, or shows it again if it's already manually hidden.
+function toggleManual(button) {
+  // Read the id at action time: YouTube recycles card elements for different videos.
   const id = cardVideoId(button.parentElement);
   if (!id) return;
   if (button.dataset.state === "show") {
@@ -227,6 +226,71 @@ function onHideClick(e) {
   }
   setManuallyHidden(id, true);
   showUndoToast(id);
+}
+
+function onHideClick(e) {
+  const button = e.target.closest?.(`.${HIDE_BTN_CLASS}`);
+  if (!button) return;
+  // Cards are links; don't open the video.
+  e.preventDefault();
+  e.stopPropagation();
+  toggleManual(button);
+}
+
+// Peek: temporarily show everything the extension hid, outlined, with a bar to leave peek mode.
+function setPeek(on) {
+  peeking = on;
+  document.documentElement.toggleAttribute("data-yth-peek", on);
+  updatePeekBar();
+}
+
+function updatePeekBar() {
+  let bar = document.getElementById(PEEK_BAR_ID);
+  if (!peeking) {
+    bar?.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = PEEK_BAR_ID;
+    bar.setAttribute("role", "status");
+    const label = document.createElement("span");
+    const done = document.createElement("button");
+    done.type = "button";
+    done.textContent = "Done";
+    done.addEventListener("click", () => setPeek(false));
+    bar.append(label, done);
+    document.body.append(bar);
+  }
+  const n = filteredCount();
+  bar.firstChild.textContent = `Peeking at ${n} hidden item${n === 1 ? "" : "s"} · press P to hide again`;
+}
+
+function isTyping(e) {
+  const el = e.composedPath()[0];
+  return el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+}
+
+// H: hide (or show again) the video under the mouse. P: peek. Plain keys only, never while typing.
+function onShortcut(e) {
+  if (e.key === "Escape" && peeking) setPeek(false);
+  if (!settings.keyboardShortcuts || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.repeat || isTyping(e)) return;
+  const key = e.key.toLowerCase();
+  if (key === "p") {
+    setPeek(!peeking);
+  } else if (key === "h") {
+    // Look up what's under the pointer now, not what was last hovered: after a hide the next card slides
+    // into place under a still mouse, so repeated H hides one video after another.
+    // All layers, not just the top one: YouTube's hover-preview player floats above the card.
+    const card = pointer && document.elementsFromPoint(pointer.x, pointer.y).map(findCard).find(Boolean);
+    const button = card?.querySelector(`:scope > .${HIDE_BTN_CLASS}`);
+    if (!button) return; // nothing under the pointer, or manual hiding is off
+    toggleManual(button);
+  } else {
+    return;
+  }
+  e.preventDefault();
+  e.stopPropagation();
 }
 
 // Overrides YouTube's videos-per-row (0 = YouTube's default).
@@ -270,6 +334,7 @@ function run() {
     for (const root of roots) if (root.isConnected) processRoot(root, ctx);
   }
   reportCount(filteredCount());
+  if (peeking) updatePeekBar();
 }
 
 function schedule() {
@@ -326,6 +391,15 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Capture phase so YouTube's own link/click handlers never see the hide click.
 document.addEventListener("click", onHideClick, true);
+document.addEventListener("keydown", onShortcut, true);
+// Last pointer position, for the H shortcut.
+document.addEventListener(
+  "pointermove",
+  (e) => {
+    pointer = { x: e.clientX, y: e.clientY };
+  },
+  { capture: true, passive: true },
+);
 
 document.addEventListener("yt-navigate-finish", scheduleFullPass);
 // href: YouTube recycles card elements by swapping links in place. style: progress bar widths update in place.

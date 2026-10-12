@@ -1,6 +1,41 @@
-.yth-hidden { display: none !important; }
-.yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
-.yth-dimmed:hover { opacity: 1; filter: none; }
+/* Peek (html[data-yth-peek]) suspends hiding and dimming and outlines what would be filtered instead. */
+html:not([data-yth-peek]) .yth-hidden { display: none !important; }
+html:not([data-yth-peek]) .yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
+html:not([data-yth-peek]) .yth-dimmed:hover { opacity: 1; filter: none; }
+html[data-yth-peek] :is(.yth-hidden, .yth-dimmed) {
+  outline: 2px dashed #3ea6ff;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+#yth-peek-bar {
+  position: fixed;
+  top: 68px;
+  left: 50%;
+  z-index: 3000;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 8px 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: #065fd4;
+  color: #fff;
+  font: 500 14px Roboto, Arial, sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+#yth-peek-bar button {
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #065fd4;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+#yth-peek-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
 /* YouTube zeroes the left margin of tiles it marks is-in-first-column, using its own per-row count and DOM order.
    Once tiles are hidden or per-row changes, that mark lands mid-row and rows go jagged.

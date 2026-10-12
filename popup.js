@@ -9,6 +9,7 @@ const CHECKBOXES = [
   "filterChannel",
   "hideShorts",
   "manualEnabled",
+  "keyboardShortcuts",
 ];
 const manualCount = document.getElementById("manualCount");
 const keywordErrors = document.getElementById("keywordErrors");

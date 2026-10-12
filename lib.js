@@ -14,6 +14,7 @@ const DEFAULTS = {
   hideShorts: false,
   tilesPerRow: 0, // 0 = YouTube's default
   manualEnabled: true,
+  keyboardShortcuts: true,
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.

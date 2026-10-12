@@ -24,6 +24,7 @@
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
     .warn { color: var(--warn); }
+    kbd { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; font: 11px ui-monospace, monospace; }
     footer { text-align: right; }
   </style>
 </head>
@@ -34,6 +35,8 @@
       <legend>Filtered videos</legend>
       <label><input type="radio" name="mode" value="hide"> Hide</label>
       <label><input type="radio" name="mode" value="dim"> Gray out</label>
+      <label><input type="checkbox" name="keyboardShortcuts"> Keyboard shortcuts</label>
+      <p class="hint"><kbd>H</kbd> hides the video under the mouse (keep pressing to hide the ones that slide in; on a grayed-out video it brings it back). <kbd>P</kbd> peeks at everything hidden.</p>
     </fieldset>
     <fieldset>
       <legend>Watched videos</legend>
