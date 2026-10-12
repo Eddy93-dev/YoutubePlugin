@@ -23,7 +23,7 @@
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["lib.js", "content.js"],
+      "js": ["lib.js", "panel.js", "content.js"],
       "css": ["content.css"]
     }
   ]
