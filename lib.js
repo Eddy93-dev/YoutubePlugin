@@ -141,6 +141,50 @@ function videoTypes({ badgeClasses = [], badgeTexts = [], overlayStyles = [], me
   return types;
 }
 
+const BACKUP_APP = "youtube-watched-hider";
+const MAX_LIST_ITEMS = 500;
+const MAX_LINE_LENGTH = 200;
+
+function makeBackup(settings, local, version, now) {
+  return { app: BACKUP_APP, version, exportedAt: new Date(now).toISOString(), settings, local };
+}
+
+// Validates an imported backup (untrusted file content). Keeps only known keys with the right types,
+// clamps sizes, and returns { settings, local, skipped }. Throws an Error with a user-facing message.
+function sanitizeBackup(data) {
+  if (!data || typeof data !== "object" || data.app !== BACKUP_APP || typeof data.settings !== "object" || !data.settings) {
+    throw new Error("This isn't a YouTube Watched Hider backup file.");
+  }
+  const settings = {};
+  let skipped = 0;
+  for (const [key, value] of Object.entries(data.settings)) {
+    const fallback = DEFAULTS[key];
+    if (fallback === undefined) continue; // unknown key, e.g. from a newer version
+    const clean = sanitizeSetting(key, value, fallback);
+    if (clean === undefined) skipped++;
+    else settings[key] = clean;
+  }
+  const local = {};
+  const hidden = data.local?.manuallyHidden;
+  if (hidden && typeof hidden === "object" && !Array.isArray(hidden)) {
+    local.manuallyHidden = Object.fromEntries(
+      Object.entries(hidden).filter(([id, at]) => VIDEO_ID.test(id) && Number.isFinite(at)),
+    );
+  }
+  return { settings, local, skipped };
+}
+
+function sanitizeSetting(key, value, fallback) {
+  if (Array.isArray(fallback)) {
+    if (!Array.isArray(value)) return undefined;
+    return value.filter((v) => typeof v === "string").map((v) => v.slice(0, MAX_LINE_LENGTH)).slice(0, MAX_LIST_ITEMS);
+  }
+  if (typeof value !== typeof fallback) return undefined;
+  if (key === "mode") return value === "hide" || value === "dim" ? value : undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  return value;
+}
+
 // "/pattern/flags" → RegExp (always case-insensitive; g/y dropped since test() with them is stateful), else null.
 function keywordRegex(line) {
   const m = line.match(/^\/(.+)\/([a-z]*)$/);
@@ -196,5 +240,7 @@ if (typeof module !== "undefined") {
     compileKeywords,
     parseAgeDays,
     videoTypes,
+    makeBackup,
+    sanitizeBackup,
   };
 }

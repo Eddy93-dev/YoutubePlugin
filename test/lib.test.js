@@ -1,6 +1,41 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS } = require("../lib.js");
+
+test("backup round-trips settings and manual hides", () => {
+  const settings = { ...DEFAULTS, threshold: 65, mode: "dim", blockedKeywords: ["reaction"] };
+  const local = { manuallyHidden: { dQw4w9WgXcQ: 1700000000000 } };
+  const restored = sanitizeBackup(JSON.parse(JSON.stringify(makeBackup(settings, local, "0.14.0", 0))));
+  assert.deepStrictEqual(restored.settings, settings);
+  assert.deepStrictEqual(restored.local, local);
+  assert.strictEqual(restored.skipped, 0);
+});
+
+test("sanitizeBackup rejects files that aren't backups", () => {
+  for (const bad of [null, "text", [], {}, { app: "other", settings: {} }, { app: "youtube-watched-hider" }]) {
+    assert.throws(() => sanitizeBackup(bad), /isn't a YouTube Watched Hider backup/);
+  }
+});
+
+test("sanitizeBackup keeps only known, well-typed values and clamps lists", () => {
+  const { settings, local, skipped } = sanitizeBackup({
+    app: "youtube-watched-hider",
+    settings: {
+      threshold: "80", // wrong type
+      mode: "explode", // not an allowed value
+      hideShorts: true,
+      maxAgeDays: Infinity, // not finite (JSON can't carry it, but guard anyway)
+      futureSetting: 1, // unknown key: ignored, not counted
+      blockedChannels: ["@ok", 42, "x".repeat(500), ...Array(600).fill("@many")],
+    },
+    local: { manuallyHidden: { dQw4w9WgXcQ: 5, "not-an-id": 5, abcdefghijk: "soon" } },
+  });
+  assert.deepStrictEqual(Object.keys(settings).sort(), ["blockedChannels", "hideShorts"]);
+  assert.strictEqual(settings.blockedChannels.length, 500);
+  assert.strictEqual(settings.blockedChannels[1].length, 200);
+  assert.strictEqual(skipped, 3);
+  assert.deepStrictEqual(local, { manuallyHidden: { dQw4w9WgXcQ: 5 } });
+});
 
 test("videoTypes detects live, upcoming, members-only and playlist/mix cards", () => {
   // Live search result as YouTube rendered it in testing: badge class + "watching" metadata.

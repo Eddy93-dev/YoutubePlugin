@@ -43,7 +43,7 @@ function render() {
   keywordErrors.textContent = `Invalid pattern${bad.length === 1 ? "" : "s"}, ignored: ${bad.join(", ")}`;
 }
 
-chrome.storage.sync.get(DEFAULTS, (s) => {
+function loadForm(s) {
   for (const key of CHECKBOXES) form[key].checked = s[key];
   form.threshold.value = s.threshold;
   form.mode.value = s.mode;
@@ -53,7 +53,9 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   form.blockedChannels.value = s.blockedChannels.join("\n");
   form.blockedKeywords.value = s.blockedKeywords.join("\n");
   render();
-});
+}
+
+chrome.storage.sync.get(DEFAULTS, loadForm);
 
 chrome.commands.getAll((commands) => {
   const shortcut = commands.find((c) => c.name === "toggle-watched")?.shortcut;
@@ -74,9 +76,62 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
 
+// --- Backup: export / import ---
+const MAX_BACKUP_BYTES = 1_000_000;
+const backupStatus = document.getElementById("backupStatus");
+const importFile = document.getElementById("importFile");
+const view = new URLSearchParams(location.search).get("view");
+// Chrome closes the toolbar popup when a file picker opens, so the toolbar popup imports from a full tab.
+const isToolbarPopup = window.top === window && view !== "tab";
+if (view === "tab") document.body.classList.add("tab-view");
+
+document.getElementById("exportBtn").addEventListener("click", async () => {
+  try {
+    const [settings, local] = await Promise.all([chrome.storage.sync.get(DEFAULTS), chrome.storage.local.get(LOCAL_DEFAULTS)]);
+    const backup = makeBackup(settings, local, chrome.runtime.getManifest().version, Date.now());
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `youtube-watched-hider-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    backupStatus.textContent = "Backup downloaded.";
+  } catch (err) {
+    backupStatus.textContent = `Export failed: ${err.message}`;
+  }
+});
+
+document.getElementById("importBtn").addEventListener("click", () => {
+  if (isToolbarPopup) {
+    chrome.tabs.create({ url: chrome.runtime.getURL("popup.html?view=tab") });
+    window.close();
+    return;
+  }
+  importFile.click();
+});
+
+importFile.addEventListener("change", async () => {
+  const file = importFile.files[0];
+  importFile.value = ""; // so picking the same file again still fires "change"
+  if (!file) return;
+  try {
+    if (file.size > MAX_BACKUP_BYTES) throw new Error("the file is too large to be a backup.");
+    const { settings, local, skipped } = sanitizeBackup(JSON.parse(await file.text()));
+    await chrome.storage.sync.set(settings);
+    await chrome.storage.local.set(local);
+    loadForm(await chrome.storage.sync.get(DEFAULTS));
+    const hiddenCount = Object.keys(local.manuallyHidden ?? {}).length;
+    const skippedNote = skipped ? ` Skipped ${skipped} invalid value${skipped === 1 ? "" : "s"}.` : "";
+    backupStatus.textContent = `Imported ${Object.keys(settings).length} settings and ${hiddenCount} hidden video${hiddenCount === 1 ? "" : "s"}.${skippedNote}`;
+  } catch (err) {
+    backupStatus.textContent = `Import failed: ${err instanceof SyntaxError ? "the file isn't valid JSON." : err.message}`;
+  }
+});
+
 form.addEventListener("input", render);
 // Save on "change" (slider release, textarea blur), not "input": storage.sync caps writes per minute.
-form.addEventListener("change", () => {
+form.addEventListener("change", (e) => {
+  if (e.target === importFile) return;
   chrome.storage.sync.set({
     ...Object.fromEntries(CHECKBOXES.map((key) => [key, form[key].checked])),
     threshold: Number(form.threshold.value),

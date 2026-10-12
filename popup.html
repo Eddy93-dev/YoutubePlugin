@@ -21,6 +21,8 @@
     input[type="range"] { flex: 1; }
     output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
     textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; color: inherit; background: var(--field); border: 1px solid var(--border); }
+    #exportBtn, #importBtn { font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 12px; cursor: pointer; }
+    body.tab-view { margin: 24px auto; }
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
     .warn { color: var(--warn); }
@@ -116,6 +118,15 @@
       <legend>Shorts</legend>
       <label><input type="checkbox" name="hideShorts"> Hide Shorts</label>
       <p class="hint">Also redirects Shorts pages to Home.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Backup</legend>
+      <div class="row">
+        <button type="button" id="exportBtn">Export</button>
+        <button type="button" id="importBtn">Import</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <p class="hint" id="backupStatus" role="status">Settings, lists and manually hidden videos, as a JSON file.</p>
     </fieldset>
   </form>
   <footer class="hint" id="version"></footer>

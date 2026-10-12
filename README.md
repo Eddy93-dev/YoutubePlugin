@@ -14,6 +14,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.
 - **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
+- **Backup:** export all settings, lists and manually hidden videos to a JSON file, and import them on another computer.
 - **Keyboard:** <kbd>H</kbd> hides the video under the mouse (keep pressing to clear the videos that slide into its place; on a grayed-out video, H brings it back), <kbd>P</kbd> peeks at everything hidden (outlined, with a bar to exit). Can be switched off in settings.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
 
