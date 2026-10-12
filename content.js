@@ -2,7 +2,8 @@
 const SEL = {
   progress:
     "ytd-thumbnail-overlay-resume-playback-renderer #progress, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment",
-  card: "ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model",
+  card: "ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer",
+  lockup: "yt-lockup-view-model", // newer card; sits inside a grid cell on Home/Subscriptions, standalone in the sidebar
   channelLink: 'a[href^="/@"], a[href^="/channel/"]',
   shortsBlocks:
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])",
@@ -14,6 +15,11 @@ const CLASSES = ["yth-hidden", "yth-dimmed"];
 let settings = DEFAULTS;
 let scheduled = false;
 let lastCount = -1;
+
+// Prefer the outer grid cell: hiding only the inner lockup leaves an empty box and the grid can't reflow.
+function findCard(el) {
+  return el.closest(SEL.card) ?? el.closest(SEL.lockup);
+}
 
 function watchedFilterActive() {
   const key = pageKey(location.pathname);
@@ -33,7 +39,7 @@ function applyWatched() {
   const cls = settings.mode === "dim" ? "yth-dimmed" : "yth-hidden";
   let count = 0;
   for (const bar of document.querySelectorAll(SEL.progress)) {
-    const card = bar.closest(SEL.card);
+    const card = findCard(bar);
     if (!card || !shouldFilter(parsePercent(bar.style.width), settings.threshold)) continue;
     if (isChannelAllowed(settings.allowedChannels, cardChannelIds(card))) continue;
     card.classList.add(cls);
@@ -47,7 +53,7 @@ function applyShorts() {
   if (!settings.hideShorts) return 0;
   for (const el of document.querySelectorAll(SEL.shortsGuide)) el.classList.add("yth-hidden");
   const blocks = [...document.querySelectorAll(SEL.shortsBlocks)];
-  const cards = [...document.querySelectorAll(SEL.shortsLink)].map((a) => a.closest(SEL.card)).filter(Boolean);
+  const cards = [...document.querySelectorAll(SEL.shortsLink)].map(findCard).filter(Boolean);
   const hidden = new Set([...blocks, ...cards]);
   for (const el of hidden) el.classList.add("yth-hidden");
   return hidden.size;
