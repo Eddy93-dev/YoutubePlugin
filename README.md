@@ -11,6 +11,11 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
 
+## Install (release)
+1. Download the latest `youtube-watched-hider-<version>.zip` from [Releases](https://github.com/Eddy93-dev/YoutubePlugin/releases/latest) and unzip it to a folder you'll keep.
+2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick that folder.
+3. To update, unzip the new version over the same folder and click reload ↻ on the extension's card.
+
 ## Install (development)
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and pick this folder.
@@ -27,9 +32,13 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 3. Privacy tab: the extension collects no user data. Settings stay in `chrome.storage.sync`. The only permission is `storage`, and the only host is `www.youtube.com`, used by the content script.
 4. Add a 1280×800 screenshot and a short description.
 
-## Versioning
+## Versioning and releases
 `version` in `manifest.json` is the single source of truth; the settings panel shows it at the bottom.
 Bump the minor version for each new feature (0.4.0 → 0.5.0) and the patch version for fixes (0.4.0 → 0.4.1).
+
+CI (`.github/workflows/ci.yml`) runs the tests and builds the package on every push and pull request.
+When a push to `main` carries a version that has no release yet, it tags `v<version>` and publishes a
+GitHub Release with the zip attached. Pushing a version bump is all it takes to release.
 
 ## Maintenance
 YouTube changes its markup often. If filtering stops working, update the `SEL` selectors at the top of `content.js`.

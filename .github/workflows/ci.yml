@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      # Catches packaging breakage (e.g. a new file missing from scripts/pack.ps1) before it reaches a release.
+      - run: npm run pack
+
+  # Publishes a GitHub Release whenever main carries a manifest version that hasn't been released yet.
+  release:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read manifest version
+        id: version
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::manifest.json version '$version' is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check for an existing release
+        id: existing
+        run: |
+          if gh release view "v${{ steps.version.outputs.version }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "v${{ steps.version.outputs.version }} is already released; nothing to do."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build package
+        if: steps.existing.outputs.exists == 'false'
+        run: npm run pack
+
+      - name: Create release
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          gh release create "v$version" "dist/youtube-watched-hider-$version.zip" \
+            --target "$GITHUB_SHA" \
+            --title "v$version" \
+            --notes-file .github/release-notes.md \
+            --generate-notes
