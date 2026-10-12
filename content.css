@@ -1,3 +1,31 @@
 .yth-hidden { display: none !important; }
 .yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
 .yth-dimmed:hover { opacity: 1; filter: none; }
+
+#yth-settings-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+#yth-settings-button:hover,
+#yth-settings-button[aria-expanded="true"] { background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05)); }
+#yth-settings-button:focus-visible { outline: 2px solid var(--yt-spec-call-to-action, #065fd4); outline-offset: 2px; }
+#yth-settings-button img { width: 24px; height: 24px; }
+
+#yth-settings-panel {
+  position: fixed;
+  z-index: 3000; /* above the masthead */
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.25);
+}
+#yth-settings-panel iframe { display: block; width: 308px; height: 480px; border: 0; }

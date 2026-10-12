@@ -2,6 +2,18 @@ const form = document.getElementById("form");
 const out = document.getElementById("thresholdOut");
 const CHECKBOXES = ["watchedEnabled", "filterSubscriptions", "filterHome", "filterSearch", "filterWatch", "hideShorts"];
 
+// Embedded as an iframe by content.js: follow YouTube's theme, report size, forward Escape.
+if (window.top !== window) {
+  const theme = new URLSearchParams(location.search).get("theme");
+  if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+  const post = (msg) => parent.postMessage(msg, "https://www.youtube.com");
+  const root = document.documentElement;
+  new ResizeObserver(() => post({ yth: "size", width: root.scrollWidth, height: root.scrollHeight })).observe(document.body);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") post({ yth: "close" });
+  });
+}
+
 function render() {
   out.value = `${form.threshold.value}%`;
   document.getElementById("watchedOptions").disabled = !form.watchedEnabled.checked;

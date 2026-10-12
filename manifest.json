@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube Watched Hider",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Hide or gray out videos you've already watched on YouTube, and hide Shorts.",
   "permissions": ["storage"],
   "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
@@ -11,6 +11,9 @@
     "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
   },
   "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [
+    { "resources": ["popup.html", "icons/icon32.png"], "matches": ["https://www.youtube.com/*"] }
+  ],
   "commands": {
     "toggle-watched": {
       "suggested_key": { "default": "Alt+Shift+H" },

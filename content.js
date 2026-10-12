@@ -9,8 +9,12 @@ const SEL = {
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])",
   shortsGuide: 'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
   shortsLink: 'a[href^="/shorts/"]',
+  mastheadCenter: "ytd-masthead #center", // flex row holding the search box
 };
 const CLASSES = ["yth-hidden", "yth-dimmed"];
+const BUTTON_ID = "yth-settings-button";
+const PANEL_ID = "yth-settings-panel";
+const EXT_ORIGIN = new URL(chrome.runtime.getURL("")).origin;
 
 let settings = DEFAULTS;
 let scheduled = false;
@@ -66,8 +70,51 @@ function reportCount(count) {
   chrome.runtime.sendMessage({ count }).catch(() => {});
 }
 
+// Settings button next to the search box; opens popup.html in an in-page panel.
+function ensureSettingsButton() {
+  if (document.getElementById(BUTTON_ID)) return;
+  const center = document.querySelector(SEL.mastheadCenter);
+  if (!center) return;
+  const button = document.createElement("button");
+  button.id = BUTTON_ID;
+  button.type = "button";
+  button.title = "YouTube Watched Hider settings";
+  button.setAttribute("aria-label", button.title);
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-controls", PANEL_ID);
+  const icon = document.createElement("img");
+  icon.src = chrome.runtime.getURL("icons/icon32.png");
+  icon.alt = "";
+  button.append(icon);
+  button.addEventListener("click", togglePanel);
+  center.append(button);
+}
+
+function togglePanel() {
+  if (document.getElementById(PANEL_ID)) return closePanel();
+  const button = document.getElementById(BUTTON_ID);
+  const rect = button.getBoundingClientRect();
+  const panel = document.createElement("div");
+  panel.id = PANEL_ID;
+  panel.style.top = `${rect.bottom + 8}px`;
+  panel.style.left = `${Math.max(8, rect.right - 308)}px`;
+  const frame = document.createElement("iframe");
+  const theme = document.documentElement.hasAttribute("dark") ? "dark" : "light";
+  frame.src = chrome.runtime.getURL(`popup.html?theme=${theme}`);
+  frame.title = button.title;
+  panel.append(frame);
+  document.body.append(panel);
+  button.setAttribute("aria-expanded", "true");
+}
+
+function closePanel() {
+  document.getElementById(PANEL_ID)?.remove();
+  document.getElementById(BUTTON_ID)?.setAttribute("aria-expanded", "false");
+}
+
 function apply() {
   scheduled = false;
+  ensureSettingsButton();
   if (settings.hideShorts && location.pathname.startsWith("/shorts/")) {
     location.replace("/");
     return;
@@ -93,6 +140,26 @@ chrome.storage.onChanged.addListener((changes, area) => {
   const updates = Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.newValue]));
   settings = { ...settings, ...updates };
   schedule();
+});
+
+// Clicks inside the iframe never reach this document, so any click here outside the button closes the panel.
+document.addEventListener("click", (e) => {
+  if (!e.target.closest?.(`#${BUTTON_ID}, #${PANEL_ID}`)) closePanel();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closePanel();
+});
+
+// The embedded popup reports its size and forwards Escape.
+window.addEventListener("message", (e) => {
+  if (e.origin !== EXT_ORIGIN) return;
+  const frame = document.querySelector(`#${PANEL_ID} iframe`);
+  if (e.data?.yth === "close") closePanel();
+  if (e.data?.yth === "size" && frame) {
+    const maxHeight = window.innerHeight - frame.getBoundingClientRect().top - 16;
+    frame.style.width = `${e.data.width}px`;
+    frame.style.height = `${Math.min(e.data.height, maxHeight)}px`;
+  }
 });
 
 document.addEventListener("yt-navigate-finish", schedule);

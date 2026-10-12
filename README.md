@@ -6,6 +6,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Channel allowlist:** channels you list (by `@handle` or name) are never hidden.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
 - **Badge:** the toolbar icon shows how many items were hidden on the current page.
+- **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
 
 ## Install (development)
