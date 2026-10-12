@@ -11,6 +11,21 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
 
+## Settings
+
+Open the settings from the toolbar icon or the button next to YouTube's search bar. Changes apply instantly.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/settings-light.png" width="300" alt="Settings panel in light theme: watched videos hidden at 80% on all pages, 3 manually hidden videos, YouTube's default layout"></td>
+    <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: watched videos grayed out at 60%, search results excluded, one channel never hidden, 5 videos per row, Shorts hidden"></td>
+  </tr>
+  <tr>
+    <td align="center">Defaults: hide anything watched past 80%</td>
+    <td align="center">Gray out at 60%, keep a favorite channel, 5 per row, no Shorts</td>
+  </tr>
+</table>
+
 ## Install (release)
 1. Download the latest `youtube-watched-hider-<version>.zip` from [Releases](https://github.com/Eddy93-dev/YoutubePlugin/releases/latest) and unzip it to a folder you'll keep.
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick that folder.
