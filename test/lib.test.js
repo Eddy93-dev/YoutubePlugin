@@ -1,6 +1,27 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords } = require("../lib.js");
+
+test("compileKeywords matches plain words case-insensitively and /patterns/ as regexes", () => {
+  const matches = compileKeywords(["Reaction", "/live ?stream/", "/^\\[ad\\]/"]);
+  assert.strictEqual(matches("My REACTION to the finale"), true);
+  assert.strictEqual(matches("Sunday LiveStream"), true);
+  assert.strictEqual(matches("Sunday live stream"), true);
+  assert.strictEqual(matches("[AD] new phone"), true);
+  assert.strictEqual(matches("Cooking pasta"), false);
+  assert.strictEqual(compileKeywords([])("anything"), false);
+});
+
+test("compileKeywords skips invalid patterns and is stateless with a g flag", () => {
+  const matches = compileKeywords(["/(unclosed/", "/news/g"]);
+  assert.strictEqual(matches("(unclosed"), false);
+  assert.strictEqual(matches("news today"), true);
+  assert.strictEqual(matches("news today"), true); // a stateful /g regex would fail the second call
+});
+
+test("invalidKeywordLines reports only broken patterns", () => {
+  assert.deepStrictEqual(invalidKeywordLines(["word", "/ok/", "/(bad/", "/[x/i"]), ["/(bad/", "/[x/i"]);
+});
 
 test("videoIdFromHref extracts ids from watch and shorts links", () => {
   assert.strictEqual(videoIdFromHref("/watch?v=dQw4w9WgXcQ&t=42s"), "dQw4w9WgXcQ");
@@ -66,14 +87,14 @@ test("channelKey extracts handles and channel ids", () => {
   assert.strictEqual(channelKey("/watch"), null);
 });
 
-test("parseChannelList drops blank lines and whitespace", () => {
-  assert.deepStrictEqual(parseChannelList(" @a \n\n  Some Name\n"), ["@a", "Some Name"]);
+test("parseLines drops blank lines and whitespace", () => {
+  assert.deepStrictEqual(parseLines(" @a \n\n  Some Name\n"), ["@a", "Some Name"]);
 });
 
-test("isChannelAllowed matches handle, id or display name, ignoring case and @", () => {
+test("channelInList matches handle, id or display name, ignoring case and @", () => {
   const allowed = ["@SomeOne", "Cool Channel"];
-  assert.strictEqual(isChannelAllowed(allowed, ["someone"]), true);
-  assert.strictEqual(isChannelAllowed(allowed, [null, " cool channel "]), true);
-  assert.strictEqual(isChannelAllowed(allowed, ["other", "Other Name"]), false);
-  assert.strictEqual(isChannelAllowed([], ["someone"]), false);
+  assert.strictEqual(channelInList(allowed, ["someone"]), true);
+  assert.strictEqual(channelInList(allowed, [null, " cool channel "]), true);
+  assert.strictEqual(channelInList(allowed, ["other", "Other Name"]), false);
+  assert.strictEqual(channelInList([], ["someone"]), false);
 });

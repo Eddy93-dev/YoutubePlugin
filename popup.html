@@ -5,11 +5,11 @@
   <title>YouTube Watched Hider</title>
   <style>
     /* data-theme is set when embedded in YouTube, so the panel follows YouTube's theme rather than the OS. */
-    :root { --fg: #0f0f0f; --bg: #fff; --border: #ddd; --muted: #606060; --field: #fff; }
+    :root { --fg: #0f0f0f; --bg: #fff; --border: #ddd; --muted: #606060; --field: #fff; --warn: #b3261e; }
     @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; }
+      :root:not([data-theme="light"]) { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; }
     }
-    :root[data-theme="dark"] { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; }
+    :root[data-theme="dark"] { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; }
     body { font: 14px system-ui, sans-serif; width: 280px; margin: 0; padding: 12px 14px; color: var(--fg); background: var(--bg); }
     h1 { font-size: 15px; margin: 0 0 10px; }
     fieldset { border: 1px solid var(--border); border-radius: 6px; margin: 0 0 10px; padding: 8px 10px; }
@@ -23,12 +23,18 @@
     textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; color: inherit; background: var(--field); border: 1px solid var(--border); }
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+    .warn { color: var(--warn); }
     footer { text-align: right; }
   </style>
 </head>
 <body>
   <h1>YouTube Watched Hider</h1>
   <form id="form">
+    <fieldset>
+      <legend>Filtered videos</legend>
+      <label><input type="radio" name="mode" value="hide"> Hide</label>
+      <label><input type="radio" name="mode" value="dim"> Gray out</label>
+    </fieldset>
     <fieldset>
       <legend>Watched videos</legend>
       <label><input type="checkbox" name="watchedEnabled"> Filter watched videos</label>
@@ -38,8 +44,6 @@
           <input type="range" id="threshold" name="threshold" min="1" max="100" step="1">
           <output id="thresholdOut" for="threshold"></output>
         </div>
-        <label><input type="radio" name="mode" value="hide"> Hide</label>
-        <label><input type="radio" name="mode" value="dim"> Gray out</label>
 
         <p class="sub">Apply on</p>
         <label><input type="checkbox" name="filterSubscriptions"> Subscriptions</label>
@@ -47,11 +51,19 @@
         <label><input type="checkbox" name="filterSearch"> Search results</label>
         <label><input type="checkbox" name="filterWatch"> Sidebar while watching</label>
         <label><input type="checkbox" name="filterChannel"> Channel pages</label>
-
-        <label class="sub" for="allowedChannels">Never hide these channels</label>
-        <textarea id="allowedChannels" name="allowedChannels" rows="3" placeholder="@handle or channel name, one per line"></textarea>
       </fieldset>
       <p class="hint" id="shortcutHint"></p>
+    </fieldset>
+    <fieldset>
+      <legend>Filters</legend>
+      <label class="sub" for="blockedKeywords">Hide titles containing</label>
+      <textarea id="blockedKeywords" name="blockedKeywords" rows="3" placeholder="one per line, e.g. reaction or /live ?stream/"></textarea>
+      <p class="hint warn" id="keywordErrors" hidden></p>
+      <label class="sub" for="blockedChannels">Hide these channels</label>
+      <textarea id="blockedChannels" name="blockedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
+      <label class="sub" for="allowedChannels">Never hide these channels</label>
+      <textarea id="allowedChannels" name="allowedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
+      <p class="hint">Filters apply on every page (hidden channels except on their own channel page). "Never hide" wins over all automatic filters.</p>
     </fieldset>
     <fieldset>
       <legend>Manually hidden</legend>

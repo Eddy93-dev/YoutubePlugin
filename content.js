@@ -5,6 +5,8 @@ const SEL = {
   card: "ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer",
   lockup: "yt-lockup-view-model", // newer card; sits inside a grid cell on Home/Subscriptions, standalone in the sidebar
   channelLink: 'a[href^="/@"], a[href^="/channel/"]',
+  title: "#video-title, h3",
+  metadataText: ".ytContentMetadataViewModelMetadataText, ytd-channel-name #text",
   shortsBlocks:
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]), " +
     'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
@@ -51,11 +53,17 @@ function watchedFilterActive() {
   return settings.watchedEnabled && key !== null && settings[key];
 }
 
+// Everything that may name a card's channel: link handles/IDs, link text, and metadata text
+// (newer cards show the channel name as plain text with no link).
 function cardChannelIds(card) {
-  return [...card.querySelectorAll(SEL.channelLink)].flatMap((a) => [
+  const ids = [...card.querySelectorAll(SEL.channelLink)].flatMap((a) => [
     channelKey(new URL(a.href).pathname),
     a.textContent,
   ]);
+  for (const el of card.querySelectorAll(SEL.metadataText)) ids.push(el.textContent);
+  // Channel pages leave the channel off their own cards; the URL says whose page it is.
+  if (pageKey(location.pathname) === "filterChannel") ids.push(channelKey(location.pathname));
+  return ids;
 }
 
 function cardVideoId(card) {
@@ -65,8 +73,24 @@ function cardVideoId(card) {
 
 function isWatched(card) {
   const bar = card.querySelector(SEL.progress);
-  if (!bar || !shouldFilter(parsePercent(bar.style.width), settings.threshold)) return false;
-  return !isChannelAllowed(settings.allowedChannels, cardChannelIds(card));
+  return !!bar && shouldFilter(parsePercent(bar.style.width), settings.threshold);
+}
+
+function cardTitle(card) {
+  return card.querySelector(SEL.title)?.textContent.trim() ?? "";
+}
+
+// Watched, blocked-channel and keyword filters. The "never hide" list overrides all of them.
+function autoFiltered(card, ctx) {
+  const channelIds = ctx.usesChannelLists ? cardChannelIds(card) : [];
+  if (channelInList(settings.allowedChannels, channelIds)) return false;
+  return (
+    (ctx.watchedActive && isWatched(card)) ||
+    // Not on channel pages: opening a blocked channel's page is deliberate, and hiding every card there
+    // makes YouTube keep loading more to fill the screen.
+    (!ctx.onChannelPage && channelInList(settings.blockedChannels, channelIds)) ||
+    ctx.matchesKeyword(cardTitle(card))
+  );
 }
 
 function makeHideButton() {
@@ -112,7 +136,7 @@ function processCard(card, ctx) {
   const isManual = settings.manualEnabled && ctx.manualIds.has(cardVideoId(card));
   syncHideButton(card, isManual);
   if (settings.hideShorts && card.querySelector(SEL.shortsLink)) card.classList.add("yth-hidden");
-  else if (isManual || (ctx.watchedActive && isWatched(card))) card.classList.add(ctx.cls);
+  else if (isManual || autoFiltered(card, ctx)) card.classList.add(ctx.cls);
 }
 
 // Cards at or inside root (inner lockups collapse into their grid cell).
@@ -230,6 +254,9 @@ function run() {
     manualIds: activeHiddenIds(manualHidden, Date.now()),
     cls: modeClass(),
     watchedActive: watchedFilterActive(),
+    matchesKeyword: compileKeywords(settings.blockedKeywords),
+    usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
+    onChannelPage: pageKey(location.pathname) === "filterChannel",
   };
   if (fullPassPending || pendingRoots.size > FULL_PASS_THRESHOLD) {
     fullPassPending = false;

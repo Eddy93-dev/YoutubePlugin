@@ -9,6 +9,8 @@ const DEFAULTS = {
   filterWatch: true,
   filterChannel: true,
   allowedChannels: [],
+  blockedChannels: [],
+  blockedKeywords: [],
   hideShorts: false,
   tilesPerRow: 0, // 0 = YouTube's default
   manualEnabled: true,
@@ -81,16 +83,68 @@ function channelKey(pathname) {
   return null;
 }
 
-function parseChannelList(text) {
+function parseLines(text) {
   return text.split("\n").map((s) => s.trim()).filter(Boolean);
 }
 
-// ids: handles, channel IDs or display names found on a card; allowed entries match any of them.
-function isChannelAllowed(allowed, ids) {
-  const set = new Set(allowed.map(normalizeChannel));
+// ids: handles, channel IDs or display names found on a card; list entries match any of them.
+function channelInList(list, ids) {
+  const set = new Set(list.map(normalizeChannel));
   return ids.some((id) => id && set.has(normalizeChannel(id)));
 }
 
+// "/pattern/flags" → RegExp (always case-insensitive; g/y dropped since test() with them is stateful), else null.
+function keywordRegex(line) {
+  const m = line.match(/^\/(.+)\/([a-z]*)$/);
+  if (!m) return null;
+  const flags = [...new Set(m[2].replace(/[gy]/g, "") + "i")].join("");
+  return new RegExp(m[1], flags); // throws on an invalid pattern
+}
+
+// Lines that look like /patterns/ but don't compile, so settings can point them out.
+function invalidKeywordLines(lines) {
+  return lines.filter((line) => {
+    try {
+      keywordRegex(line);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+}
+
+// Title matcher: plain lines are case-insensitive substrings, /pattern/ lines are regexes. Invalid patterns never match.
+function compileKeywords(lines) {
+  const tests = [];
+  for (const line of lines) {
+    let re;
+    try {
+      re = keywordRegex(line);
+    } catch {
+      continue; // reported in settings via invalidKeywordLines
+    }
+    const needle = line.toLowerCase();
+    tests.push(re ? (title) => re.test(title) : (title) => title.toLowerCase().includes(needle));
+  }
+  return (title) => tests.some((matches) => matches(title));
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { DEFAULTS, LOCAL_DEFAULTS, MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed };
+  module.exports = {
+    DEFAULTS,
+    LOCAL_DEFAULTS,
+    MANUAL_TTL_MS,
+    normalizeHidden,
+    activeHiddenIds,
+    msUntilNextExpiry,
+    videoIdFromHref,
+    parsePercent,
+    shouldFilter,
+    pageKey,
+    channelKey,
+    parseLines,
+    channelInList,
+    invalidKeywordLines,
+    compileKeywords,
+  };
 }

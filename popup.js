@@ -11,6 +11,7 @@ const CHECKBOXES = [
   "manualEnabled",
 ];
 const manualCount = document.getElementById("manualCount");
+const keywordErrors = document.getElementById("keywordErrors");
 let manualHidden = {};
 
 // Embedded as an iframe by content.js: follow YouTube's theme, report size, forward Escape.
@@ -30,6 +31,9 @@ function render() {
   document.getElementById("watchedOptions").disabled = !form.watchedEnabled.checked;
   const n = activeHiddenIds(manualHidden, Date.now()).size;
   manualCount.textContent = `${n} video${n === 1 ? "" : "s"} hidden.`;
+  const bad = invalidKeywordLines(parseLines(form.blockedKeywords.value));
+  keywordErrors.hidden = bad.length === 0;
+  keywordErrors.textContent = `Invalid pattern${bad.length === 1 ? "" : "s"}, ignored: ${bad.join(", ")}`;
 }
 
 chrome.storage.sync.get(DEFAULTS, (s) => {
@@ -38,6 +42,8 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   form.mode.value = s.mode;
   form.tilesPerRow.value = String(s.tilesPerRow);
   form.allowedChannels.value = s.allowedChannels.join("\n");
+  form.blockedChannels.value = s.blockedChannels.join("\n");
+  form.blockedKeywords.value = s.blockedKeywords.join("\n");
   render();
 });
 
@@ -68,6 +74,8 @@ form.addEventListener("change", () => {
     threshold: Number(form.threshold.value),
     mode: form.mode.value,
     tilesPerRow: Number(form.tilesPerRow.value),
-    allowedChannels: parseChannelList(form.allowedChannels.value),
+    allowedChannels: parseLines(form.allowedChannels.value),
+    blockedChannels: parseLines(form.blockedChannels.value),
+    blockedKeywords: parseLines(form.blockedKeywords.value),
   });
 });
