@@ -9,6 +9,7 @@ const DEFAULTS = {
   filterWatch: true,
   allowedChannels: [],
   hideShorts: false,
+  tilesPerRow: 0, // 0 = YouTube's default
 };
 
 function parsePercent(width) {

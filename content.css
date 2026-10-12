@@ -2,6 +2,17 @@
 .yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
 .yth-dimmed:hover { opacity: 1; filter: none; }
 
+/* YouTube zeroes the left margin of tiles it marks is-in-first-column, using its own per-row count and DOM order.
+   Once tiles are hidden or per-row changes, that mark lands mid-row and rows go jagged.
+   Tile width is 100%/n - margin, so a uniform right margin fills each row exactly. */
+ytd-rich-grid-renderer > #contents > ytd-rich-item-renderer[rendered-from-rich-grid] {
+  margin-left: 0 !important;
+  margin-right: var(--ytd-rich-grid-item-margin) !important;
+}
+html[data-yth-per-row] ytd-rich-grid-renderer {
+  --ytd-rich-grid-items-per-row: var(--yth-per-row) !important;
+}
+
 #yth-settings-button {
   flex: none;
   display: inline-flex;

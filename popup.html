@@ -21,7 +21,9 @@
     input[type="range"] { flex: 1; }
     output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
     textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; color: inherit; background: var(--field); border: 1px solid var(--border); }
+    select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+    footer { text-align: right; }
   </style>
 </head>
 <body>
@@ -51,11 +53,27 @@
       <p class="hint" id="shortcutHint"></p>
     </fieldset>
     <fieldset>
+      <legend>Layout</legend>
+      <label for="tilesPerRow">Videos per row
+        <select id="tilesPerRow" name="tilesPerRow">
+          <option value="0">Auto</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+        </select>
+      </label>
+      <p class="hint">More per row means smaller thumbnails (Home, Subscriptions, channel pages).</p>
+    </fieldset>
+    <fieldset>
       <legend>Shorts</legend>
       <label><input type="checkbox" name="hideShorts"> Hide Shorts</label>
       <p class="hint">Also redirects Shorts pages to Home.</p>
     </fieldset>
   </form>
+  <footer class="hint" id="version"></footer>
   <script src="lib.js"></script>
   <script src="popup.js"></script>
 </body>

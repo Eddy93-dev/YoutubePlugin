@@ -5,6 +5,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Watched videos:** hides or grays out videos you've watched past a threshold (default 80%) on Subscriptions, Home, Search and the watch-page sidebar. Each page can be switched on or off.
 - **Channel allowlist:** channels you list (by `@handle` or name) are never hidden.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
+- **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.
 - **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
@@ -24,6 +25,10 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 2. Upload the zip at the [Developer Dashboard](https://chrome.google.com/webstore/devconsole) (one-time $5 registration).
 3. Privacy tab: the extension collects no user data. Settings stay in `chrome.storage.sync`. The only permission is `storage`, and the only host is `www.youtube.com`, used by the content script.
 4. Add a 1280×800 screenshot and a short description.
+
+## Versioning
+`version` in `manifest.json` is the single source of truth; the settings panel shows it at the bottom.
+Bump the minor version for each new feature (0.4.0 → 0.5.0) and the patch version for fixes (0.4.0 → 0.4.1).
 
 ## Maintenance
 YouTube changes its markup often. If filtering stops working, update the `SEL` selectors at the top of `content.js`.

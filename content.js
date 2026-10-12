@@ -14,6 +14,8 @@ const SEL = {
 const CLASSES = ["yth-hidden", "yth-dimmed"];
 const BUTTON_ID = "yth-settings-button";
 const PANEL_ID = "yth-settings-panel";
+const MIN_PER_ROW = 2;
+const MAX_PER_ROW = 10;
 const EXT_ORIGIN = new URL(chrome.runtime.getURL("")).origin;
 
 let settings = DEFAULTS;
@@ -112,6 +114,19 @@ function closePanel() {
   document.getElementById(BUTTON_ID)?.setAttribute("aria-expanded", "false");
 }
 
+// Overrides YouTube's videos-per-row (0 = YouTube's default).
+function applyGridSize() {
+  const root = document.documentElement;
+  const perRow = Number(settings.tilesPerRow);
+  if (Number.isInteger(perRow) && perRow >= MIN_PER_ROW && perRow <= MAX_PER_ROW) {
+    root.dataset.ythPerRow = String(perRow);
+    root.style.setProperty("--yth-per-row", String(perRow));
+  } else {
+    delete root.dataset.ythPerRow;
+    root.style.removeProperty("--yth-per-row");
+  }
+}
+
 function apply() {
   scheduled = false;
   ensureSettingsButton();
@@ -132,6 +147,7 @@ function schedule() {
 
 chrome.storage.sync.get(DEFAULTS, (stored) => {
   settings = stored;
+  applyGridSize();
   schedule();
 });
 
@@ -139,6 +155,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "sync") return;
   const updates = Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.newValue]));
   settings = { ...settings, ...updates };
+  applyGridSize();
   schedule();
 });
 

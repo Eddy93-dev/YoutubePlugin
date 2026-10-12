@@ -23,6 +23,7 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   for (const key of CHECKBOXES) form[key].checked = s[key];
   form.threshold.value = s.threshold;
   form.mode.value = s.mode;
+  form.tilesPerRow.value = String(s.tilesPerRow);
   form.allowedChannels.value = s.allowedChannels.join("\n");
   render();
 });
@@ -34,6 +35,8 @@ chrome.commands.getAll((commands) => {
     : "Set a toggle shortcut at chrome://extensions/shortcuts.";
 });
 
+document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;
+
 form.addEventListener("input", render);
 // Save on "change" (slider release, textarea blur), not "input": storage.sync caps writes per minute.
 form.addEventListener("change", () => {
@@ -41,6 +44,7 @@ form.addEventListener("change", () => {
     ...Object.fromEntries(CHECKBOXES.map((key) => [key, form[key].checked])),
     threshold: Number(form.threshold.value),
     mode: form.mode.value,
+    tilesPerRow: Number(form.tilesPerRow.value),
     allowedChannels: parseChannelList(form.allowedChannels.value),
   });
 });
