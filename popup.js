@@ -42,6 +42,7 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
   form.threshold.value = s.threshold;
   form.mode.value = s.mode;
   form.tilesPerRow.value = String(s.tilesPerRow);
+  form.maxAgeDays.value = String(s.maxAgeDays);
   form.allowedChannels.value = s.allowedChannels.join("\n");
   form.blockedChannels.value = s.blockedChannels.join("\n");
   form.blockedKeywords.value = s.blockedKeywords.join("\n");
@@ -75,6 +76,7 @@ form.addEventListener("change", () => {
     threshold: Number(form.threshold.value),
     mode: form.mode.value,
     tilesPerRow: Number(form.tilesPerRow.value),
+    maxAgeDays: Number(form.maxAgeDays.value),
     allowedChannels: parseLines(form.allowedChannels.value),
     blockedChannels: parseLines(form.blockedChannels.value),
     blockedKeywords: parseLines(form.blockedKeywords.value),

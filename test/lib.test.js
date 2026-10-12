@@ -1,6 +1,29 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays } = require("../lib.js");
+
+test("parseAgeDays reads full and abbreviated English relative ages", () => {
+  const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≉ ${expected}`);
+  assert.strictEqual(parseAgeDays("3 days ago"), 3);
+  assert.strictEqual(parseAgeDays("1 day ago"), 1);
+  near(parseAgeDays("22 hr ago"), 22 / 24);
+  near(parseAgeDays("5 hours ago"), 5 / 24);
+  assert.strictEqual(parseAgeDays("2 weeks ago"), 14);
+  assert.strictEqual(parseAgeDays("3 wk ago"), 21);
+  assert.strictEqual(parseAgeDays("1 mo ago"), 30);
+  assert.strictEqual(parseAgeDays("11 months ago"), 330);
+  assert.strictEqual(parseAgeDays("2 years ago"), 730);
+  assert.strictEqual(parseAgeDays("Streamed 1 yr ago"), 365);
+  near(parseAgeDays("45 minutes ago"), 45 / 1440);
+  near(parseAgeDays("10 min ago"), 10 / 1440);
+  near(parseAgeDays("30 seconds ago"), 30 / 86400);
+});
+
+test("parseAgeDays returns null for text without an age", () => {
+  assert.strictEqual(parseAgeDays("1.2M views"), null);
+  assert.strictEqual(parseAgeDays("Scheduled for 5/1/26"), null);
+  assert.strictEqual(parseAgeDays(""), null);
+});
 
 test("compileKeywords matches plain words case-insensitively and /patterns/ as regexes", () => {
   const matches = compileKeywords(["Reaction", "/live ?stream/", "/^\\[ad\\]/"]);

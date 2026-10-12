@@ -15,6 +15,7 @@ const DEFAULTS = {
   tilesPerRow: 0, // 0 = YouTube's default
   manualEnabled: true,
   keyboardShortcuts: true,
+  maxAgeDays: 0, // 0 = off
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
@@ -94,6 +95,19 @@ function channelInList(list, ids) {
   return ids.some((id) => id && set.has(normalizeChannel(id)));
 }
 
+const AGE_UNIT_DAYS = { s: 1 / 86400, mi: 1 / 1440, h: 1 / 24, d: 1, w: 7, mo: 30, y: 365 };
+// Full and abbreviated English units: "3 days ago", "22 hr ago", "1 mo ago", "2 wk ago", "Streamed 5 years ago".
+const AGE_PATTERN = /(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|weeks?|wks?|months?|mos?|years?|yrs?)\s+ago\b/i;
+
+// Age in days from YouTube's relative upload text, or null if the text has none.
+function parseAgeDays(text) {
+  const m = AGE_PATTERN.exec(text);
+  if (!m) return null;
+  const unit = m[2].toLowerCase();
+  const key = unit.startsWith("mo") ? "mo" : unit.startsWith("mi") ? "mi" : unit[0];
+  return Number(m[1]) * AGE_UNIT_DAYS[key];
+}
+
 // "/pattern/flags" → RegExp (always case-insensitive; g/y dropped since test() with them is stateful), else null.
 function keywordRegex(line) {
   const m = line.match(/^\/(.+)\/([a-z]*)$/);
@@ -147,5 +161,6 @@ if (typeof module !== "undefined") {
     channelInList,
     invalidKeywordLines,
     compileKeywords,
+    parseAgeDays,
   };
 }

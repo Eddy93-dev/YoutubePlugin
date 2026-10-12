@@ -7,6 +7,7 @@ const SEL = {
   channelLink: 'a[href^="/@"], a[href^="/channel/"]',
   title: "#video-title, h3",
   metadataText: ".ytContentMetadataViewModelMetadataText, ytd-channel-name #text",
+  ageText: ".ytContentMetadataViewModelMetadataText, #metadata-line span, .inline-metadata-item",
   shortsBlocks:
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]), " +
     'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
@@ -79,6 +80,15 @@ function isWatched(card) {
   return !!bar && shouldFilter(parsePercent(bar.style.width), settings.threshold);
 }
 
+// Upload age in days from the card's "… ago" metadata, or null if it shows none (e.g. live or scheduled).
+function cardAgeDays(card) {
+  for (const el of card.querySelectorAll(SEL.ageText)) {
+    const days = parseAgeDays(el.textContent);
+    if (days !== null) return days;
+  }
+  return null;
+}
+
 function cardTitle(card) {
   return card.querySelector(SEL.title)?.textContent.trim() ?? "";
 }
@@ -92,7 +102,9 @@ function autoFiltered(card, ctx) {
     // Not on channel pages: opening a blocked channel's page is deliberate, and hiding every card there
     // makes YouTube keep loading more to fill the screen.
     (!ctx.onChannelPage && channelInList(settings.blockedChannels, channelIds)) ||
-    ctx.matchesKeyword(cardTitle(card))
+    ctx.matchesKeyword(cardTitle(card)) ||
+    // Not on channel pages either: hiding older uploads there would page through the whole back catalog.
+    (ctx.maxAgeDays > 0 && !ctx.onChannelPage && cardAgeDays(card) > ctx.maxAgeDays)
   );
 }
 
@@ -321,6 +333,7 @@ function run() {
     matchesKeyword: compileKeywords(settings.blockedKeywords),
     usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
     onChannelPage: pageKey(location.pathname) === "filterChannel",
+    maxAgeDays: Number(settings.maxAgeDays) || 0,
   };
   if (fullPassPending || pendingRoots.size > FULL_PASS_THRESHOLD) {
     fullPassPending = false;

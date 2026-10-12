@@ -62,11 +62,24 @@
       <label class="sub" for="blockedKeywords">Hide titles containing</label>
       <textarea id="blockedKeywords" name="blockedKeywords" rows="3" placeholder="one per line, e.g. reaction or /live ?stream/"></textarea>
       <p class="hint warn" id="keywordErrors" hidden></p>
+      <label class="sub" for="maxAgeDays">Hide videos older than
+        <select id="maxAgeDays" name="maxAgeDays">
+          <option value="0">Off</option>
+          <option value="1">1 day</option>
+          <option value="3">3 days</option>
+          <option value="7">1 week</option>
+          <option value="14">2 weeks</option>
+          <option value="30">1 month</option>
+          <option value="90">3 months</option>
+          <option value="180">6 months</option>
+          <option value="365">1 year</option>
+        </select>
+      </label>
       <label class="sub" for="blockedChannels">Hide these channels</label>
       <textarea id="blockedChannels" name="blockedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
       <label class="sub" for="allowedChannels">Never hide these channels</label>
       <textarea id="allowedChannels" name="allowedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
-      <p class="hint">Filters apply on every page (hidden channels except on their own channel page). "Never hide" wins over all automatic filters.</p>
+      <p class="hint">Filters apply on every page; channel and age filters skip channel pages. Age needs YouTube in English. "Never hide" wins over all automatic filters.</p>
     </fieldset>
     <fieldset>
       <legend>Manually hidden</legend>

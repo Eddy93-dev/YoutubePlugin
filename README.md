@@ -5,6 +5,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Watched videos:** hides or grays out videos you've watched past a threshold (default 80%) on Subscriptions, Home, Search, the watch-page sidebar and channel pages. Each page can be switched on or off.
 - **Manual hide:** hover a thumbnail and click the eye icon to hide that video everywhere, with Undo. They follow the Hide / Gray out choice; when grayed out, the same button becomes an eye icon that shows the video again. Switch "Hide videos I've hidden" off to show them again without losing the list. Each hide expires automatically 48 hours after you made it. Stored locally on this device.
 - **Keyword filter:** hide videos whose title contains a word, or matches a `/pattern/` (regular expression).
+- **Age filter:** hide videos older than 1 day to 1 year (not on channel pages; reads YouTube's English "… ago" text).
 - **Channel blocklist:** always hide videos from channels you list (by `@handle` or name).
 - **Never hide:** channels you list are never hidden by any automatic filter.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
