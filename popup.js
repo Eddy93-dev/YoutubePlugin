@@ -1,6 +1,16 @@
 const form = document.getElementById("form");
 const out = document.getElementById("thresholdOut");
-const CHECKBOXES = ["watchedEnabled", "filterSubscriptions", "filterHome", "filterSearch", "filterWatch", "hideShorts"];
+const CHECKBOXES = [
+  "watchedEnabled",
+  "filterSubscriptions",
+  "filterHome",
+  "filterSearch",
+  "filterWatch",
+  "hideShorts",
+  "manualEnabled",
+];
+const manualCount = document.getElementById("manualCount");
+let manualHidden = {};
 
 // Embedded as an iframe by content.js: follow YouTube's theme, report size, forward Escape.
 if (window.top !== window) {
@@ -17,6 +27,8 @@ if (window.top !== window) {
 function render() {
   out.value = `${form.threshold.value}%`;
   document.getElementById("watchedOptions").disabled = !form.watchedEnabled.checked;
+  const n = activeHiddenIds(manualHidden, Date.now()).size;
+  manualCount.textContent = `${n} video${n === 1 ? "" : "s"} hidden.`;
 }
 
 chrome.storage.sync.get(DEFAULTS, (s) => {
@@ -33,6 +45,16 @@ chrome.commands.getAll((commands) => {
   document.getElementById("shortcutHint").textContent = shortcut
     ? `${shortcut} toggles this filter.`
     : "Set a toggle shortcut at chrome://extensions/shortcuts.";
+});
+
+chrome.storage.local.get(LOCAL_DEFAULTS, (s) => {
+  manualHidden = normalizeHidden(s.manuallyHidden, Date.now());
+  render();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.manuallyHidden) return;
+  manualHidden = normalizeHidden(changes.manuallyHidden.newValue, Date.now());
+  render();
 });
 
 document.getElementById("version").textContent = `v${chrome.runtime.getManifest().version}`;

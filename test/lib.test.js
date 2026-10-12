@@ -1,6 +1,27 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed } = require("../lib.js");
+
+test("videoIdFromHref extracts ids from watch and shorts links", () => {
+  assert.strictEqual(videoIdFromHref("/watch?v=dQw4w9WgXcQ&t=42s"), "dQw4w9WgXcQ");
+  assert.strictEqual(videoIdFromHref("https://www.youtube.com/watch?v=abc-_123XYZ"), "abc-_123XYZ");
+  assert.strictEqual(videoIdFromHref("/shorts/abc-_123XYZ"), "abc-_123XYZ");
+  assert.strictEqual(videoIdFromHref("/watch?v=tooShort"), null);
+  assert.strictEqual(videoIdFromHref("/@channel"), null);
+});
+
+test("normalizeHidden migrates the old id array and rejects junk", () => {
+  assert.deepStrictEqual(normalizeHidden(["aaaaaaaaaaa", "bbbbbbbbbbb"], 5), { aaaaaaaaaaa: 5, bbbbbbbbbbb: 5 });
+  assert.deepStrictEqual(normalizeHidden({ aaaaaaaaaaa: 1 }, 5), { aaaaaaaaaaa: 1 });
+  assert.deepStrictEqual(normalizeHidden(undefined, 5), {});
+});
+
+test("activeHiddenIds drops hides older than 48 hours", () => {
+  assert.strictEqual(MANUAL_TTL_MS, 48 * 60 * 60 * 1000);
+  const now = 10 * MANUAL_TTL_MS;
+  const hidden = { fresh: now - 1000, almost: now - MANUAL_TTL_MS + 1, stale: now - MANUAL_TTL_MS };
+  assert.deepStrictEqual([...activeHiddenIds(hidden, now)], ["fresh", "almost"]);
+});
 
 test("parsePercent reads inline width styles", () => {
   assert.strictEqual(parsePercent("80%"), 80);

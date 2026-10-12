@@ -13,6 +13,70 @@ html[data-yth-per-row] ytd-rich-grid-renderer {
   --ytd-rich-grid-items-per-row: var(--yth-per-row) !important;
 }
 
+/* Manual hide button: top-left of the thumbnail, shown on card hover or keyboard focus. */
+:has(> .yth-hide-btn) { position: relative; }
+.yth-hide-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.yth-hide-btn svg { width: 18px; height: 18px; fill: currentColor; }
+:hover > .yth-hide-btn, .yth-hide-btn:focus-visible { opacity: 1; }
+.yth-hide-btn:hover { background: rgba(0, 0, 0, 0.9); }
+.yth-hide-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* Bottom-center undo toast. The light border keeps it visible on YouTube's dark theme (#0f0f0f page). */
+#yth-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  z-index: 3000;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 12px 12px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  background: #282828;
+  color: #fff;
+  font: 500 16px Roboto, Arial, sans-serif;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  animation: yth-toast-in 0.2s ease-out;
+}
+#yth-toast button {
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #3ea6ff;
+  color: #0f0f0f;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+#yth-toast button:hover { background: #65b8ff; }
+#yth-toast button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@keyframes yth-toast-in {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #yth-toast { animation: none; }
+}
+
 #yth-settings-button {
   flex: none;
   display: inline-flex;

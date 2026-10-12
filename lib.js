@@ -10,7 +10,33 @@ const DEFAULTS = {
   allowedChannels: [],
   hideShorts: false,
   tilesPerRow: 0, // 0 = YouTube's default
+  manualEnabled: true,
 };
+
+// chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
+const LOCAL_DEFAULTS = { manuallyHidden: {} };
+const MANUAL_TTL_MS = 48 * 60 * 60 * 1000;
+
+// v0.5.0 stored a plain array of ids; treat those as hidden now.
+function normalizeHidden(value, now) {
+  if (Array.isArray(value)) return Object.fromEntries(value.map((id) => [id, now]));
+  return value && typeof value === "object" ? value : {};
+}
+
+// Ids that should currently be hidden; each hide expires MANUAL_TTL_MS after it was made.
+function activeHiddenIds(hidden, now) {
+  const active = Object.entries(hidden).filter(([, at]) => now - at < MANUAL_TTL_MS);
+  return new Set(active.map(([id]) => id));
+}
+
+const VIDEO_ID = /^[\w-]{11}$/;
+
+// "/watch?v=ID…" or "/shorts/ID" → ID, otherwise null.
+function videoIdFromHref(href) {
+  const url = new URL(href, "https://www.youtube.com");
+  const id = url.pathname === "/watch" ? url.searchParams.get("v") : url.pathname.match(/^\/shorts\/([^/]+)/)?.[1];
+  return id && VIDEO_ID.test(id) ? id : null;
+}
 
 function parsePercent(width) {
   const n = parseFloat(width);
@@ -51,5 +77,5 @@ function isChannelAllowed(allowed, ids) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { DEFAULTS, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed };
+  module.exports = { DEFAULTS, LOCAL_DEFAULTS, MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed };
 }
