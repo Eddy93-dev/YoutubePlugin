@@ -14,7 +14,7 @@ html[data-yth-per-row] ytd-rich-grid-renderer {
 }
 
 /* Manual hide button: top-left of the thumbnail, shown on card hover or keyboard focus. */
-:has(> .yth-hide-btn) { position: relative; }
+.yth-card { position: relative; }
 .yth-hide-btn {
   position: absolute;
   top: 8px;
@@ -35,7 +35,7 @@ html[data-yth-per-row] ytd-rich-grid-renderer {
   transition: opacity 0.15s;
 }
 .yth-hide-btn svg { width: 18px; height: 18px; fill: currentColor; }
-:hover > .yth-hide-btn, .yth-hide-btn:focus-visible { opacity: 1; }
+.yth-card:hover > .yth-hide-btn, .yth-hide-btn:focus-visible { opacity: 1; }
 .yth-hide-btn:hover { background: rgba(0, 0, 0, 0.9); }
 .yth-hide-btn:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
 

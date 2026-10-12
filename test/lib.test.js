@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed } = require("../lib.js");
 
 test("videoIdFromHref extracts ids from watch and shorts links", () => {
   assert.strictEqual(videoIdFromHref("/watch?v=dQw4w9WgXcQ&t=42s"), "dQw4w9WgXcQ");
@@ -21,6 +21,13 @@ test("activeHiddenIds drops hides older than 48 hours", () => {
   const now = 10 * MANUAL_TTL_MS;
   const hidden = { fresh: now - 1000, almost: now - MANUAL_TTL_MS + 1, stale: now - MANUAL_TTL_MS };
   assert.deepStrictEqual([...activeHiddenIds(hidden, now)], ["fresh", "almost"]);
+});
+
+test("msUntilNextExpiry returns the soonest remaining time, ignoring expired hides", () => {
+  const now = 10 * MANUAL_TTL_MS;
+  assert.strictEqual(msUntilNextExpiry({}, now), null);
+  assert.strictEqual(msUntilNextExpiry({ old: now - MANUAL_TTL_MS }, now), null);
+  assert.strictEqual(msUntilNextExpiry({ a: now - 1000, b: now - 5000, old: now - 2 * MANUAL_TTL_MS }, now), MANUAL_TTL_MS - 5000);
 });
 
 test("parsePercent reads inline width styles", () => {

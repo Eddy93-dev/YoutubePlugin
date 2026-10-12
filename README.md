@@ -3,7 +3,7 @@
 Chrome extension (Manifest V3, no build step, no dependencies):
 
 - **Watched videos:** hides or grays out videos you've watched past a threshold (default 80%) on Subscriptions, Home, Search and the watch-page sidebar. Each page can be switched on or off.
-- **Manual hide:** hover a thumbnail and click the eye icon to hide that video everywhere, with Undo. They follow the Hide / Gray out choice. Switch "Hide videos I've hidden" off to show them again without losing the list. Each hide expires automatically 48 hours after you made it. Stored locally on this device.
+- **Manual hide:** hover a thumbnail and click the eye icon to hide that video everywhere, with Undo. They follow the Hide / Gray out choice; when grayed out, the same button becomes an eye icon that shows the video again. Switch "Hide videos I've hidden" off to show them again without losing the list. Each hide expires automatically 48 hours after you made it. Stored locally on this device.
 - **Channel allowlist:** channels you list (by `@handle` or name) are never hidden.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
 - **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.

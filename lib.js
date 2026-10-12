@@ -29,7 +29,17 @@ function activeHiddenIds(hidden, now) {
   return new Set(active.map(([id]) => id));
 }
 
-const VIDEO_ID = /^[\w-]{11}$/;
+// Milliseconds until the soonest still-active hide expires, or null if none are active.
+function msUntilNextExpiry(hidden, now) {
+  let soonest = null;
+  for (const at of Object.values(hidden)) {
+    const left = at + MANUAL_TTL_MS - now;
+    if (left > 0 && (soonest === null || left < soonest)) soonest = left;
+  }
+  return soonest;
+}
+
+const VIDEO_ID =/^[\w-]{11}$/;
 
 // "/watch?v=ID…" or "/shorts/ID" → ID, otherwise null.
 function videoIdFromHref(href) {
@@ -77,5 +87,5 @@ function isChannelAllowed(allowed, ids) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { DEFAULTS, LOCAL_DEFAULTS, MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed };
+  module.exports = { DEFAULTS, LOCAL_DEFAULTS, MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseChannelList, isChannelAllowed };
 }

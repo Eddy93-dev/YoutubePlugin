@@ -6,13 +6,16 @@ const SEL = {
   lockup: "yt-lockup-view-model", // newer card; sits inside a grid cell on Home/Subscriptions, standalone in the sidebar
   channelLink: 'a[href^="/@"], a[href^="/channel/"]',
   shortsBlocks:
-    "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])",
-  shortsGuide: 'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
+    "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]), " +
+    'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
+  shortsGuide: "ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer", // hidden but not counted in the badge
   shortsLink: 'a[href^="/shorts/"]',
   videoLink: 'a[href^="/watch?"], a[href^="/shorts/"]',
   mastheadCenter: "ytd-masthead #center", // flex row holding the search box
 };
+const ANY_CARD = `${SEL.card}, ${SEL.lockup}`;
 const CLASSES = ["yth-hidden", "yth-dimmed"];
+const CARD_CLASS = "yth-card"; // cards carrying our hide button (positioning + hover)
 const BUTTON_ID = "yth-settings-button";
 const PANEL_ID = "yth-settings-panel";
 const MIN_PER_ROW = 2;
@@ -21,14 +24,21 @@ const EXT_ORIGIN = new URL(chrome.runtime.getURL("")).origin;
 const HIDE_BTN_CLASS = "yth-hide-btn";
 const TOAST_ID = "yth-toast";
 const TOAST_MS = 5000;
-// Material "visibility_off" icon (Apache 2.0).
+// Past this many changed subtrees in one frame (initial load, big re-render), one full pass is cheaper.
+const FULL_PASS_THRESHOLD = 200;
+// Material "visibility_off" / "visibility" icons (Apache 2.0).
 const EYE_OFF_PATH =
   "M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z";
+const EYE_PATH =
+  "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z";
 
 let settings = DEFAULTS;
 let manualHidden = {};
-let scheduled = false;
 let lastCount = -1;
+let scheduled = false;
+let fullPassPending = false;
+const pendingRoots = new Set();
+let expiryTimer;
 
 // Prefer the outer grid cell: hiding only the inner lockup leaves an empty box and the grid can't reflow.
 function findCard(el) {
@@ -52,66 +62,93 @@ function cardChannelIds(card) {
   ]);
 }
 
-// Returns how many cards were filtered.
-function applyWatched() {
-  if (!watchedFilterActive()) return 0;
-  const cls = modeClass();
-  let count = 0;
-  for (const bar of document.querySelectorAll(SEL.progress)) {
-    const card = findCard(bar);
-    if (!card || card.matches(".yth-hidden, .yth-dimmed") || !shouldFilter(parsePercent(bar.style.width), settings.threshold)) continue;
-    if (isChannelAllowed(settings.allowedChannels, cardChannelIds(card))) continue;
-    card.classList.add(cls);
-    count++;
-  }
-  return count;
-}
-
 function cardVideoId(card) {
   const link = card.querySelector(SEL.videoLink);
   return link ? videoIdFromHref(link.getAttribute("href")) : null;
 }
 
-// Every distinct video card on the page (inner lockups collapse into their grid cell).
-function allCards() {
-  const found = [...document.querySelectorAll(`${SEL.card}, ${SEL.lockup}`)].map(findCard);
-  return new Set(found);
+function isWatched(card) {
+  const bar = card.querySelector(SEL.progress);
+  if (!bar || !shouldFilter(parsePercent(bar.style.width), settings.threshold)) return false;
+  return !isChannelAllowed(settings.allowedChannels, cardChannelIds(card));
 }
 
 function makeHideButton() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = HIDE_BTN_CLASS;
-  button.title = "Hide this video";
-  button.setAttribute("aria-label", button.title);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("d", EYE_OFF_PATH);
-  svg.append(path);
+  svg.append(document.createElementNS("http://www.w3.org/2000/svg", "path"));
   button.append(svg);
   return button;
 }
 
-// Adds hide buttons to new cards and hides manually hidden videos. Returns how many were hidden.
-function applyManual() {
+// "hide" on normal cards; "show" on manually hidden ones (visible when grayed out) to undo the hide.
+function setButtonState(button, isManual) {
+  const state = isManual ? "show" : "hide";
+  if (button.dataset.state === state) return;
+  button.dataset.state = state;
+  button.title = isManual ? "Show this video again" : "Hide this video";
+  button.setAttribute("aria-label", button.title);
+  button.querySelector("path").setAttribute("d", isManual ? EYE_PATH : EYE_OFF_PATH);
+}
+
+function syncHideButton(card, isManual) {
+  let button = card.querySelector(`:scope > .${HIDE_BTN_CLASS}`);
   if (!settings.manualEnabled) {
-    for (const button of document.querySelectorAll(`.${HIDE_BTN_CLASS}`)) button.remove();
-    return 0;
+    button?.remove();
+    card.classList.remove(CARD_CLASS);
+    return;
   }
-  // Recomputed every pass, so a hide that crosses 48h while the tab is open shows again on the next DOM change.
-  const ids = activeHiddenIds(manualHidden, Date.now());
-  const cls = modeClass();
-  let count = 0;
-  for (const card of allCards()) {
-    if (!card.querySelector(`:scope > .${HIDE_BTN_CLASS}`)) card.append(makeHideButton());
-    if (ids.has(cardVideoId(card))) {
-      card.classList.add(cls);
-      count++;
-    }
+  if (!button) {
+    button = makeHideButton();
+    card.classList.add(CARD_CLASS);
+    card.append(button);
   }
-  return count;
+  setButtonState(button, isManual);
+}
+
+// Decides one card's state from scratch. ctx holds values that are the same for every card in a pass.
+function processCard(card, ctx) {
+  card.classList.remove(...CLASSES);
+  const isManual = settings.manualEnabled && ctx.manualIds.has(cardVideoId(card));
+  syncHideButton(card, isManual);
+  if (settings.hideShorts && card.querySelector(SEL.shortsLink)) card.classList.add("yth-hidden");
+  else if (isManual || (ctx.watchedActive && isWatched(card))) card.classList.add(ctx.cls);
+}
+
+// Cards at or inside root (inner lockups collapse into their grid cell).
+function cardsIn(root) {
+  const cards = new Set();
+  const own = findCard(root);
+  if (own) cards.add(own);
+  for (const el of root.querySelectorAll(ANY_CARD)) cards.add(findCard(el));
+  return cards;
+}
+
+function shortsBlocksIn(root) {
+  const own = root.closest(SEL.shortsBlocks);
+  return own ? [own, ...root.querySelectorAll(SEL.shortsBlocks)] : root.querySelectorAll(SEL.shortsBlocks);
+}
+
+function processRoot(root, ctx) {
+  for (const card of cardsIn(root)) processCard(card, ctx);
+  if (!settings.hideShorts) return;
+  for (const block of shortsBlocksIn(root)) block.classList.add("yth-hidden");
+}
+
+function filteredCount() {
+  const marked = document.querySelectorAll(".yth-hidden, .yth-dimmed").length;
+  return marked - document.querySelectorAll(`:is(${SEL.shortsGuide}).yth-hidden`).length;
+}
+
+function reportCount(count) {
+  if (count === lastCount || !chrome.runtime?.id) return; // runtime.id is gone after the extension reloads
+  lastCount = count;
+  // Badge is cosmetic; ignore failures (e.g. service worker restarting).
+  chrome.runtime.sendMessage({ count }).catch(() => {});
 }
 
 async function setManuallyHidden(id, hidden) {
@@ -123,6 +160,17 @@ async function setManuallyHidden(id, hidden) {
   const live = activeHiddenIds(current, now);
   const kept = Object.entries(current).filter(([key]) => key !== id && live.has(key));
   await chrome.storage.local.set({ manuallyHidden: Object.fromEntries(hidden ? [...kept, [id, now]] : kept) });
+}
+
+// Re-run when the next manual hide expires, so it comes back even if the page is idle.
+function armExpiryTimer() {
+  clearTimeout(expiryTimer);
+  const ms = msUntilNextExpiry(manualHidden, Date.now());
+  if (ms === null) return;
+  expiryTimer = setTimeout(() => {
+    scheduleFullPass();
+    armExpiryTimer();
+  }, ms + 1000); // +1s so the hide has certainly expired when we check
 }
 
 function showUndoToast(id) {
@@ -153,26 +201,12 @@ function onHideClick(e) {
   // Read the id at click time: YouTube recycles card elements for different videos.
   const id = cardVideoId(button.parentElement);
   if (!id) return;
+  if (button.dataset.state === "show") {
+    setManuallyHidden(id, false);
+    return;
+  }
   setManuallyHidden(id, true);
   showUndoToast(id);
-}
-
-// Returns how many shelves/cards were hidden (sidebar entries aren't counted).
-function applyShorts() {
-  if (!settings.hideShorts) return 0;
-  for (const el of document.querySelectorAll(SEL.shortsGuide)) el.classList.add("yth-hidden");
-  const blocks = [...document.querySelectorAll(SEL.shortsBlocks)];
-  const cards = [...document.querySelectorAll(SEL.shortsLink)].map(findCard).filter(Boolean);
-  const hidden = new Set([...blocks, ...cards]);
-  for (const el of hidden) el.classList.add("yth-hidden");
-  return hidden.size;
-}
-
-function reportCount(count) {
-  if (count === lastCount || !chrome.runtime?.id) return; // runtime.id is gone after the extension reloads
-  lastCount = count;
-  // Badge is cosmetic; ignore failures (e.g. service worker restarting).
-  chrome.runtime.sendMessage({ count }).catch(() => {});
 }
 
 // Settings button next to the search box; opens popup.html in an in-page panel.
@@ -230,47 +264,83 @@ function applyGridSize() {
   }
 }
 
-function apply() {
+// Full pass after settings, storage, navigation or expiry changes; otherwise only the subtrees that changed.
+function run() {
   scheduled = false;
   ensureSettingsButton();
   if (settings.hideShorts && location.pathname.startsWith("/shorts/")) {
     location.replace("/");
     return;
   }
-  // Reset first so loosened settings (higher threshold, shorts off) un-hide cards.
-  for (const el of document.querySelectorAll(".yth-hidden, .yth-dimmed")) el.classList.remove(...CLASSES);
-  // Manual first so applyWatched skips (and doesn't double count) cards already hidden or dimmed.
-  const manual = applyManual();
-  reportCount(manual + applyWatched() + applyShorts());
+  const ctx = {
+    manualIds: activeHiddenIds(manualHidden, Date.now()),
+    cls: modeClass(),
+    watchedActive: watchedFilterActive(),
+  };
+  if (fullPassPending || pendingRoots.size > FULL_PASS_THRESHOLD) {
+    fullPassPending = false;
+    pendingRoots.clear();
+    // Clears shelves and guide entries too, so loosened settings un-hide them.
+    for (const el of document.querySelectorAll(".yth-hidden, .yth-dimmed")) el.classList.remove(...CLASSES);
+    processRoot(document.documentElement, ctx);
+  } else {
+    const roots = [...pendingRoots];
+    pendingRoots.clear();
+    for (const root of roots) if (root.isConnected) processRoot(root, ctx);
+  }
+  reportCount(filteredCount());
 }
 
 function schedule() {
   if (scheduled) return;
   scheduled = true;
-  requestAnimationFrame(apply);
+  requestAnimationFrame(run);
+}
+
+function scheduleFullPass() {
+  fullPassPending = true;
+  schedule();
+}
+
+function onMutations(records) {
+  for (const record of records) {
+    if (record.type === "attributes") {
+      // Only the enclosing card can change; never rescan a big container whose style YouTube tweaks.
+      const card = findCard(record.target);
+      if (card) pendingRoots.add(card);
+    } else {
+      for (const node of record.addedNodes) {
+        // Skip our own hide buttons: their card was just processed.
+        if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains(HIDE_BTN_CLASS)) pendingRoots.add(node);
+      }
+    }
+  }
+  if (pendingRoots.size) schedule();
 }
 
 chrome.storage.sync.get(DEFAULTS, (stored) => {
   settings = stored;
   applyGridSize();
-  schedule();
+  scheduleFullPass();
 });
 
 chrome.storage.local.get(LOCAL_DEFAULTS, (stored) => {
   manualHidden = normalizeHidden(stored.manuallyHidden, Date.now());
-  schedule();
+  armExpiryTimer();
+  scheduleFullPass();
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local" && changes.manuallyHidden) {
     manualHidden = normalizeHidden(changes.manuallyHidden.newValue, Date.now());
-    schedule();
+    armExpiryTimer();
+    scheduleFullPass();
   }
   if (area !== "sync") return;
   const updates = Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.newValue]));
   settings = { ...settings, ...updates };
   applyGridSize();
-  schedule();
+  scheduleFullPass();
 });
 
 // Capture phase so YouTube's own link/click handlers never see the hide click.
@@ -296,6 +366,12 @@ window.addEventListener("message", (e) => {
   }
 });
 
-document.addEventListener("yt-navigate-finish", schedule);
-// childList only: our own class changes don't retrigger the observer.
-new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+document.addEventListener("yt-navigate-finish", scheduleFullPass);
+// href: YouTube recycles card elements by swapping links in place. style: progress bar widths update in place.
+// Our own changes are class / d / aria attributes, which aren't observed, so we don't retrigger ourselves.
+new MutationObserver(onMutations).observe(document.documentElement, {
+  childList: true,
+  subtree: true,
+  attributes: true,
+  attributeFilter: ["href", "style"],
+});
