@@ -16,6 +16,10 @@ const DEFAULTS = {
   manualEnabled: true,
   keyboardShortcuts: true,
   maxAgeDays: 0, // 0 = off
+  hideLive: false,
+  hideUpcoming: false,
+  hideMembers: false,
+  hidePlaylists: false,
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
@@ -108,6 +112,33 @@ function parseAgeDays(text) {
   return Number(m[1]) * AGE_UNIT_DAYS[key];
 }
 
+// Which special types a card is, from signals content.js collects: badge classes and texts, thumbnail
+// overlay styles, metadata texts and link hrefs. Class/attribute signals work in any UI language; text
+// signals are English fallbacks. Returns a subset of ["live", "upcoming", "members", "playlist"].
+function videoTypes({ badgeClasses = [], badgeTexts = [], overlayStyles = [], metaTexts = [], hrefs = [] }) {
+  const types = [];
+  const anyText = (list, re) => list.some((t) => re.test(t));
+  if (
+    badgeClasses.some((c) => /BadgeShapeLive|badge-shape--live|live-now/.test(c)) ||
+    overlayStyles.includes("LIVE") ||
+    anyText(metaTexts, /\bwatching\b/i)
+  ) {
+    types.push("live");
+  }
+  if (
+    overlayStyles.includes("UPCOMING") ||
+    anyText(badgeTexts, /^(upcoming|premiere)$/i) ||
+    anyText(metaTexts, /\b(scheduled for|premieres|waiting)\b/i)
+  ) {
+    types.push("upcoming");
+  }
+  if (badgeClasses.some((c) => /members-only|MembersOnly/.test(c)) || anyText(badgeTexts, /^members (only|first)$/i)) {
+    types.push("members");
+  }
+  if (hrefs.some((h) => /[?&]list=/.test(h))) types.push("playlist");
+  return types;
+}
+
 // "/pattern/flags" → RegExp (always case-insensitive; g/y dropped since test() with them is stateful), else null.
 function keywordRegex(line) {
   const m = line.match(/^\/(.+)\/([a-z]*)$/);
@@ -162,5 +193,6 @@ if (typeof module !== "undefined") {
     invalidKeywordLines,
     compileKeywords,
     parseAgeDays,
+    videoTypes,
   };
 }

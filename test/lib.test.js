@@ -1,6 +1,28 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes } = require("../lib.js");
+
+test("videoTypes detects live, upcoming, members-only and playlist/mix cards", () => {
+  // Live search result as YouTube rendered it in testing: badge class + "watching" metadata.
+  assert.deepStrictEqual(videoTypes({ badgeClasses: ["ytBadgeShapeHost ytBadgeShapeLive ytBadgeShapeModern"], metaTexts: ["4.8k watching"] }), ["live"]);
+  assert.deepStrictEqual(videoTypes({ overlayStyles: ["LIVE"] }), ["live"]);
+  assert.deepStrictEqual(videoTypes({ overlayStyles: ["UPCOMING"] }), ["upcoming"]);
+  assert.deepStrictEqual(videoTypes({ metaTexts: ["Scheduled for 10/20/26, 8:00 PM"] }), ["upcoming"]);
+  assert.deepStrictEqual(videoTypes({ metaTexts: ["120 waiting"] }), ["upcoming"]);
+  assert.deepStrictEqual(videoTypes({ badgeClasses: ["badge badge-style-type-members-only"] }), ["members"]);
+  assert.deepStrictEqual(videoTypes({ badgeTexts: ["Members only"] }), ["members"]);
+  // Mix link as seen in testing, and a regular playlist.
+  assert.deepStrictEqual(videoTypes({ hrefs: ["/watch?v=abc&list=RD_jH2oTNRe7g&start_radio=1"] }), ["playlist"]);
+  assert.deepStrictEqual(videoTypes({ hrefs: ["/playlist?list=PL123"] }), ["playlist"]);
+});
+
+test("videoTypes leaves ordinary videos untyped", () => {
+  assert.deepStrictEqual(
+    videoTypes({ badgeClasses: ["ytBadgeShapeHost"], badgeTexts: ["22 products", "New"], overlayStyles: ["DEFAULT"], metaTexts: ["1.2M views", "3 days ago"], hrefs: ["/watch?v=abc"] }),
+    [],
+  );
+  assert.deepStrictEqual(videoTypes({}), []);
+});
 
 test("parseAgeDays reads full and abbreviated English relative ages", () => {
   const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≉ ${expected}`);

@@ -10,6 +10,10 @@ const CHECKBOXES = [
   "hideShorts",
   "manualEnabled",
   "keyboardShortcuts",
+  "hideLive",
+  "hideUpcoming",
+  "hideMembers",
+  "hidePlaylists",
 ];
 const manualCount = document.getElementById("manualCount");
 const keywordErrors = document.getElementById("keywordErrors");

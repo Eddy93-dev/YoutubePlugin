@@ -2,12 +2,16 @@
 const SEL = {
   progress:
     "ytd-thumbnail-overlay-resume-playback-renderer #progress, .ytThumbnailOverlayProgressBarHostWatchedProgressBarSegment",
-  card: "ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer",
+  card:
+    "ytd-rich-item-renderer, ytd-grid-video-renderer, ytd-video-renderer, ytd-compact-video-renderer, " +
+    "ytd-playlist-renderer, ytd-radio-renderer, ytd-grid-playlist-renderer",
   lockup: "yt-lockup-view-model", // newer card; sits inside a grid cell on Home/Subscriptions, standalone in the sidebar
   channelLink: 'a[href^="/@"], a[href^="/channel/"]',
   title: "#video-title, h3",
   metadataText: ".ytContentMetadataViewModelMetadataText, ytd-channel-name #text",
   ageText: ".ytContentMetadataViewModelMetadataText, #metadata-line span, .inline-metadata-item",
+  badge: "badge-shape, .badge, ytd-badge-supported-renderer .badge",
+  anyVideoLink: 'a[href^="/watch?"], a[href^="/playlist?"]',
   shortsBlocks:
     "ytd-reel-shelf-renderer, ytd-rich-shelf-renderer[is-shorts], ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts]), " +
     'ytd-guide-entry-renderer:has(a[title="Shorts"]), ytd-mini-guide-entry-renderer[aria-label="Shorts"]',
@@ -89,6 +93,18 @@ function cardAgeDays(card) {
   return null;
 }
 
+// Special types (live, upcoming, members, playlist) from the card's badges, overlays, metadata and links.
+function cardTypes(card) {
+  const all = (sel, read) => [...card.querySelectorAll(sel)].map(read);
+  return videoTypes({
+    badgeClasses: all(SEL.badge, (e) => String(e.className)),
+    badgeTexts: all(SEL.badge, (e) => e.textContent.trim()),
+    overlayStyles: all("[overlay-style]", (e) => e.getAttribute("overlay-style")),
+    metaTexts: all(SEL.ageText, (e) => e.textContent.trim()),
+    hrefs: all(SEL.anyVideoLink, (e) => e.getAttribute("href")),
+  });
+}
+
 function cardTitle(card) {
   return card.querySelector(SEL.title)?.textContent.trim() ?? "";
 }
@@ -103,8 +119,10 @@ function autoFiltered(card, ctx) {
     // makes YouTube keep loading more to fill the screen.
     (!ctx.onChannelPage && channelInList(settings.blockedChannels, channelIds)) ||
     ctx.matchesKeyword(cardTitle(card)) ||
-    // Not on channel pages either: hiding older uploads there would page through the whole back catalog.
-    (ctx.maxAgeDays > 0 && !ctx.onChannelPage && cardAgeDays(card) > ctx.maxAgeDays)
+    // Age and type filters skip channel pages too: hiding most of a channel's uploads (older ones, its
+    // live tab) would make YouTube page through the whole back catalog.
+    (!ctx.onChannelPage && ctx.maxAgeDays > 0 && cardAgeDays(card) > ctx.maxAgeDays) ||
+    (!ctx.onChannelPage && ctx.hiddenTypes.size > 0 && cardTypes(card).some((t) => ctx.hiddenTypes.has(t)))
   );
 }
 
@@ -334,6 +352,14 @@ function run() {
     usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
     onChannelPage: pageKey(location.pathname) === "filterChannel",
     maxAgeDays: Number(settings.maxAgeDays) || 0,
+    hiddenTypes: new Set(
+      [
+        settings.hideLive && "live",
+        settings.hideUpcoming && "upcoming",
+        settings.hideMembers && "members",
+        settings.hidePlaylists && "playlist",
+      ].filter(Boolean),
+    ),
   };
   if (fullPassPending || pendingRoots.size > FULL_PASS_THRESHOLD) {
     fullPassPending = false;

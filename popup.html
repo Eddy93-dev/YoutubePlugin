@@ -75,11 +75,16 @@
           <option value="365">1 year</option>
         </select>
       </label>
+      <p class="sub">Hide video types</p>
+      <label><input type="checkbox" name="hideLive"> Live now</label>
+      <label><input type="checkbox" name="hideUpcoming"> Upcoming and premieres</label>
+      <label><input type="checkbox" name="hideMembers"> Members only</label>
+      <label><input type="checkbox" name="hidePlaylists"> Mixes and playlists</label>
       <label class="sub" for="blockedChannels">Hide these channels</label>
       <textarea id="blockedChannels" name="blockedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
       <label class="sub" for="allowedChannels">Never hide these channels</label>
       <textarea id="allowedChannels" name="allowedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
-      <p class="hint">Filters apply on every page; channel and age filters skip channel pages. Age needs YouTube in English. "Never hide" wins over all automatic filters.</p>
+      <p class="hint">Filters apply on every page; channel, age and type filters skip channel pages. Age needs YouTube in English. "Never hide" wins over all automatic filters.</p>
     </fieldset>
     <fieldset>
       <legend>Manually hidden</legend>
