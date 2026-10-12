@@ -5,25 +5,36 @@
   <title>YouTube Watched Hider</title>
   <style>
     /* data-theme is set when embedded in YouTube, so the panel follows YouTube's theme rather than the OS. */
-    :root { --fg: #0f0f0f; --bg: #fff; --border: #ddd; --muted: #606060; --field: #fff; --warn: #b3261e; }
+    :root { --fg: #0f0f0f; --bg: #fff; --border: #ddd; --muted: #606060; --field: #fff; --warn: #b3261e; --hover: rgba(0, 0, 0, 0.05); }
     @media (prefers-color-scheme: dark) {
-      :root:not([data-theme="light"]) { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; }
+      :root:not([data-theme="light"]) { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; --hover: rgba(255, 255, 255, 0.06); }
     }
-    :root[data-theme="dark"] { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; }
+    :root[data-theme="dark"] { --fg: #f1f1f1; --bg: #212121; --border: #3f3f3f; --muted: #aaa; --field: #181818; --warn: #f2b8b5; --hover: rgba(255, 255, 255, 0.06); }
     body { font: 14px system-ui, sans-serif; width: 280px; margin: 0; padding: 12px 14px; color: var(--fg); background: var(--bg); }
+    body.tab-view { margin: 24px auto; }
     h1 { font-size: 15px; margin: 0 0 10px; }
-    fieldset { border: 1px solid var(--border); border-radius: 6px; margin: 0 0 10px; padding: 8px 10px; }
-    fieldset fieldset { border: 0; padding: 0; margin: 0; }
+
+    /* Collapsible sections; the summary line shows the section's current settings at a glance. */
+    details.section { border: 1px solid var(--border); border-radius: 8px; margin: 0 0 8px; }
+    details.section > summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; list-style: none; font-weight: 600; white-space: nowrap; }
+    details.section > summary::-webkit-details-marker { display: none; }
+    details.section > summary::before { content: ""; flex: none; width: 5px; height: 5px; margin: 0 2px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
+    details.section[open] > summary::before { transform: rotate(45deg); }
+    details.section > summary:hover { background: var(--hover); }
+    details.section > summary:focus-visible { outline: 2px solid #065fd4; outline-offset: -2px; }
+    .status { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 400; text-align: right; text-overflow: ellipsis; }
+    .section-body { padding: 0 10px 10px; }
+    @media (prefers-reduced-motion: reduce) { details.section > summary::before { transition: none; } }
+
+    fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
     fieldset:disabled { opacity: 0.5; }
-    legend { font-weight: 600; padding: 0 4px; }
     .sub { font-weight: 600; font-size: 12px; margin: 10px 0 2px; }
     label, .row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
     input[type="range"] { flex: 1; }
     output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
     textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; color: inherit; background: var(--field); border: 1px solid var(--border); }
-    #exportBtn, #importBtn { font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 12px; cursor: pointer; }
-    body.tab-view { margin: 24px auto; }
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
+    #exportBtn, #importBtn { font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 12px; cursor: pointer; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
     .warn { color: var(--warn); }
     .alert { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; font-size: 13px; }
@@ -41,106 +52,129 @@
     <a href="https://github.com/Eddy93-dev/YoutubePlugin/issues" target="_blank" rel="noopener">Report it or check for an update</a>
   </div>
   <form id="form">
-    <fieldset>
-      <legend>Filtered videos</legend>
-      <label><input type="radio" name="mode" value="hide"> Hide</label>
-      <label><input type="radio" name="mode" value="dim"> Gray out</label>
-      <label><input type="checkbox" name="keyboardShortcuts"> Keyboard shortcuts</label>
-      <p class="hint"><kbd>H</kbd> hides the video under the mouse (keep pressing to hide the ones that slide in; on a grayed-out video it brings it back). <kbd>P</kbd> peeks at everything hidden.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Watched videos</legend>
-      <label><input type="checkbox" name="watchedEnabled"> Filter watched videos</label>
-      <fieldset id="watchedOptions">
-        <label for="threshold">Watched at least</label>
-        <div class="row">
-          <input type="range" id="threshold" name="threshold" min="1" max="100" step="1">
-          <output id="thresholdOut" for="threshold"></output>
-        </div>
-
-        <p class="sub">Apply on</p>
-        <label><input type="checkbox" name="filterSubscriptions"> Subscriptions</label>
-        <label><input type="checkbox" name="filterHome"> Home</label>
-        <label><input type="checkbox" name="filterSearch"> Search results</label>
-        <label><input type="checkbox" name="filterWatch"> Sidebar while watching</label>
-        <label><input type="checkbox" name="filterChannel"> Channel pages</label>
-      </fieldset>
-      <p class="hint" id="shortcutHint"></p>
-    </fieldset>
-    <fieldset>
-      <legend>Filters</legend>
-      <label class="sub" for="blockedKeywords">Hide titles containing</label>
-      <textarea id="blockedKeywords" name="blockedKeywords" rows="3" placeholder="one per line, e.g. reaction or /live ?stream/"></textarea>
-      <p class="hint warn" id="keywordErrors" hidden></p>
-      <label class="sub" for="maxAgeDays">Hide videos older than
-        <select id="maxAgeDays" name="maxAgeDays">
-          <option value="0">Off</option>
-          <option value="1">1 day</option>
-          <option value="3">3 days</option>
-          <option value="7">1 week</option>
-          <option value="14">2 weeks</option>
-          <option value="30">1 month</option>
-          <option value="90">3 months</option>
-          <option value="180">6 months</option>
-          <option value="365">1 year</option>
-        </select>
-      </label>
-      <p class="sub">Hide video types</p>
-      <label><input type="checkbox" name="hideLive"> Live now</label>
-      <label><input type="checkbox" name="hideUpcoming"> Upcoming and premieres</label>
-      <label><input type="checkbox" name="hideMembers"> Members only</label>
-      <label><input type="checkbox" name="hidePlaylists"> Mixes and playlists</label>
-      <label class="sub" for="blockedChannels">Hide these channels</label>
-      <textarea id="blockedChannels" name="blockedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
-      <label class="sub" for="allowedChannels">Never hide these channels</label>
-      <textarea id="allowedChannels" name="allowedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
-      <p class="hint">Filters apply on every page; channel, age and type filters skip channel pages. Age needs YouTube in English. "Never hide" wins over all automatic filters.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Manually hidden</legend>
-      <label><input type="checkbox" name="manualEnabled"> Hide videos I've hidden</label>
-      <p class="hint"><span id="manualCount"></span> Hover a thumbnail and click the eye icon to hide it. Each comes back after 48 hours.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Home clean-up</legend>
-      <label><input type="checkbox" name="hideHomeShelves"> Hide extra shelves on Home</label>
-      <p class="hint">News, trending, posts, Playables, Shorts and other add-on sections.</p>
-      <label><input type="checkbox" name="hideSponsored"> Hide sponsored tiles and banners</label>
-    </fieldset>
-    <fieldset>
-      <legend>Layout</legend>
-      <label for="tilesPerRow">Videos per row
-        <select id="tilesPerRow" name="tilesPerRow">
-          <option value="0">Auto</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-        </select>
-      </label>
-      <p class="hint">More per row means smaller thumbnails (Home, Subscriptions, channel pages).</p>
-    </fieldset>
-    <fieldset>
-      <legend>Shorts</legend>
-      <label><input type="checkbox" name="hideShorts"> Hide Shorts</label>
-      <p class="hint">Also redirects Shorts pages to Home.</p>
-    </fieldset>
-    <fieldset>
-      <legend>Stats</legend>
-      <p id="statsSummary">Nothing filtered yet.</p>
-      <p class="hint" id="statsReasons"></p>
-    </fieldset>
-    <fieldset>
-      <legend>Backup</legend>
-      <div class="row">
-        <button type="button" id="exportBtn">Export</button>
-        <button type="button" id="importBtn">Import</button>
-        <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <details class="section" data-section="general" open>
+      <summary>General<span class="status" id="status-general"></span></summary>
+      <div class="section-body">
+        <p class="sub">Filtered videos</p>
+        <label><input type="radio" name="mode" value="hide"> Hide</label>
+        <label><input type="radio" name="mode" value="dim"> Gray out</label>
+        <label><input type="checkbox" name="keyboardShortcuts"> Keyboard shortcuts</label>
+        <p class="hint"><kbd>H</kbd> hides the video under the mouse (keep pressing to hide the ones that slide in; on a grayed-out video it brings it back). <kbd>P</kbd> peeks at everything hidden.</p>
       </div>
-      <p class="hint" id="backupStatus" role="status">Settings, lists and manually hidden videos, as a JSON file.</p>
-    </fieldset>
+    </details>
+
+    <details class="section" data-section="watched" open>
+      <summary>Watched videos<span class="status" id="status-watched"></span></summary>
+      <div class="section-body">
+        <label><input type="checkbox" name="watchedEnabled"> Filter watched videos</label>
+        <fieldset id="watchedOptions">
+          <label for="threshold">Watched at least</label>
+          <div class="row">
+            <input type="range" id="threshold" name="threshold" min="1" max="100" step="1">
+            <output id="thresholdOut" for="threshold"></output>
+          </div>
+          <p class="sub">Apply on</p>
+          <label><input type="checkbox" name="filterSubscriptions"> Subscriptions</label>
+          <label><input type="checkbox" name="filterHome"> Home</label>
+          <label><input type="checkbox" name="filterSearch"> Search results</label>
+          <label><input type="checkbox" name="filterWatch"> Sidebar while watching</label>
+          <label><input type="checkbox" name="filterChannel"> Channel pages</label>
+        </fieldset>
+        <p class="hint" id="shortcutHint"></p>
+      </div>
+    </details>
+
+    <details class="section" data-section="content">
+      <summary>Content filters<span class="status" id="status-content"></span></summary>
+      <div class="section-body">
+        <label class="sub" for="blockedKeywords">Hide titles containing</label>
+        <textarea id="blockedKeywords" name="blockedKeywords" rows="3" placeholder="one per line, e.g. reaction or /live ?stream/"></textarea>
+        <p class="hint warn" id="keywordErrors" hidden></p>
+        <label class="sub" for="maxAgeDays">Hide videos older than
+          <select id="maxAgeDays" name="maxAgeDays">
+            <option value="0">Off</option>
+            <option value="1">1 day</option>
+            <option value="3">3 days</option>
+            <option value="7">1 week</option>
+            <option value="14">2 weeks</option>
+            <option value="30">1 month</option>
+            <option value="90">3 months</option>
+            <option value="180">6 months</option>
+            <option value="365">1 year</option>
+          </select>
+        </label>
+        <p class="sub">Hide video types</p>
+        <label><input type="checkbox" name="hideLive"> Live now</label>
+        <label><input type="checkbox" name="hideUpcoming"> Upcoming and premieres</label>
+        <label><input type="checkbox" name="hideMembers"> Members only</label>
+        <label><input type="checkbox" name="hidePlaylists"> Mixes and playlists</label>
+        <p class="hint">Applies on every page; age and type filters skip channel pages. Age needs YouTube in English.</p>
+      </div>
+    </details>
+
+    <details class="section" data-section="channels">
+      <summary>Channels<span class="status" id="status-channels"></span></summary>
+      <div class="section-body">
+        <label class="sub" for="blockedChannels">Hide these channels</label>
+        <textarea id="blockedChannels" name="blockedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
+        <label class="sub" for="allowedChannels">Never hide these channels</label>
+        <textarea id="allowedChannels" name="allowedChannels" rows="2" placeholder="@handle or channel name, one per line"></textarea>
+        <p class="hint">Hidden channels still show on their own channel page. "Never hide" wins over every automatic filter.</p>
+      </div>
+    </details>
+
+    <details class="section" data-section="manual">
+      <summary>Manually hidden<span class="status" id="status-manual"></span></summary>
+      <div class="section-body">
+        <label><input type="checkbox" name="manualEnabled"> Hide videos I've hidden</label>
+        <p class="hint"><span id="manualCount"></span> Hover a thumbnail and click the eye icon to hide it. Each comes back after 48 hours.</p>
+      </div>
+    </details>
+
+    <details class="section" data-section="cleanup">
+      <summary>Clean-up<span class="status" id="status-cleanup"></span></summary>
+      <div class="section-body">
+        <label><input type="checkbox" name="hideShorts"> Hide Shorts</label>
+        <p class="hint">Also redirects Shorts pages to Home.</p>
+        <label><input type="checkbox" name="hideHomeShelves"> Hide extra shelves on Home</label>
+        <p class="hint">News, trending, posts, Playables, Shorts and other add-on sections.</p>
+        <label><input type="checkbox" name="hideSponsored"> Hide sponsored tiles and banners</label>
+      </div>
+    </details>
+
+    <details class="section" data-section="layout">
+      <summary>Layout<span class="status" id="status-layout"></span></summary>
+      <div class="section-body">
+        <label for="tilesPerRow">Videos per row
+          <select id="tilesPerRow" name="tilesPerRow">
+            <option value="0">Auto</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+        <p class="hint">More per row means smaller thumbnails (Home, Subscriptions, channel pages).</p>
+      </div>
+    </details>
+
+    <details class="section" data-section="data">
+      <summary>Stats &amp; backup<span class="status" id="status-data"></span></summary>
+      <div class="section-body">
+        <p class="sub">Stats</p>
+        <p id="statsSummary">Nothing filtered yet.</p>
+        <p class="hint" id="statsReasons"></p>
+        <p class="sub">Backup</p>
+        <div class="row">
+          <button type="button" id="exportBtn">Export</button>
+          <button type="button" id="importBtn">Import</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+        <p class="hint" id="backupStatus" role="status">Settings, lists and manually hidden videos, as a JSON file.</p>
+      </div>
+    </details>
   </form>
   <footer class="hint" id="version"></footer>
   <script src="lib.js"></script>

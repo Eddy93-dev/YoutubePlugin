@@ -23,6 +23,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 ## Settings
 
 Open the settings from the toolbar icon or the button next to YouTube's search bar. Changes apply instantly.
+Settings are grouped into collapsible sections; each header shows what's currently on, and the panel remembers which sections you keep open.
 
 <table>
   <tr>

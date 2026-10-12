@@ -41,6 +41,67 @@ function render() {
   const bad = invalidKeywordLines(parseLines(form.blockedKeywords.value));
   keywordErrors.hidden = bad.length === 0;
   keywordErrors.textContent = `Invalid pattern${bad.length === 1 ? "" : "s"}, ignored: ${bad.join(", ")}`;
+  renderStatuses(bad.length > 0);
+}
+
+// One-line summaries on the section headers, so collapsed sections still show what's on.
+const PAGE_TOGGLES = ["filterSubscriptions", "filterHome", "filterSearch", "filterWatch", "filterChannel"];
+const TYPE_TOGGLES = ["hideLive", "hideUpcoming", "hideMembers", "hidePlaylists"];
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const setStatus = (key, text) => {
+  document.getElementById(`status-${key}`).textContent = text;
+};
+const countChecked = (keys) => keys.filter((key) => form[key].checked).length;
+const joinParts = (parts, empty) => parts.filter(Boolean).join(" · ") || empty;
+
+function renderStatuses(hasInvalidKeyword) {
+  setStatus("general", joinParts([form.mode.value === "dim" ? "Gray out" : "Hide", form.keyboardShortcuts.checked && "keys on"]));
+  setStatus(
+    "watched",
+    form.watchedEnabled.checked ? `${form.threshold.value}% · ${plural(countChecked(PAGE_TOGGLES), "page")}` : "Off",
+  );
+  const keywords = parseLines(form.blockedKeywords.value).length;
+  const types = countChecked(TYPE_TOGGLES);
+  setStatus(
+    "content",
+    joinParts(
+      [
+        hasInvalidKeyword && "⚠ invalid pattern",
+        keywords && plural(keywords, "keyword"),
+        form.maxAgeDays.value !== "0" && `> ${form.maxAgeDays.selectedOptions[0].text}`,
+        types && plural(types, "type"),
+      ],
+      "Off",
+    ),
+  );
+  const blocked = parseLines(form.blockedChannels.value).length;
+  const never = parseLines(form.allowedChannels.value).length;
+  setStatus("channels", joinParts([blocked && `${blocked} hidden`, never && `${never} never`], "None"));
+  setStatus("manual", form.manualEnabled.checked ? `${activeHiddenIds(manualHidden, Date.now()).size} hidden` : "Off");
+  setStatus(
+    "cleanup",
+    joinParts([form.hideShorts.checked && "Shorts", form.hideHomeShelves.checked && "shelves", form.hideSponsored.checked && "ads"], "Off"),
+  );
+  setStatus("layout", form.tilesPerRow.value === "0" ? "Auto" : `${form.tilesPerRow.value} per row`);
+}
+
+// Remember which sections are open (per browser; a convenience, so storage failures just keep the defaults).
+const OPEN_SECTIONS_KEY = "yth-open-sections";
+const sections = [...document.querySelectorAll("details.section")];
+try {
+  const saved = JSON.parse(localStorage.getItem(OPEN_SECTIONS_KEY));
+  if (Array.isArray(saved)) for (const section of sections) section.open = saved.includes(section.dataset.section);
+} catch {
+  // unavailable or corrupt: keep the open/closed defaults from the HTML
+}
+for (const section of sections) {
+  section.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(OPEN_SECTIONS_KEY, JSON.stringify(sections.filter((s) => s.open).map((s) => s.dataset.section)));
+    } catch {
+      // not remembered this time; harmless
+    }
+  });
 }
 
 function loadForm(s) {
@@ -107,6 +168,7 @@ function renderStats(stats) {
     .sort((a, b) => b[1] - a[1])
     .map(([reason, n]) => `${REASON_LABELS[reason] ?? reason} ${n}`);
   document.getElementById("statsReasons").textContent = parts.length ? `Last 30 days by reason: ${parts.join(", ")}` : "";
+  setStatus("data", today ? `${today} filtered today` : "");
 }
 
 chrome.storage.local.get(LOCAL_DEFAULTS, (s) => {
