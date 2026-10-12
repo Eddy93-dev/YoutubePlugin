@@ -346,9 +346,21 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Capture phase so YouTube's own link/click handlers never see the hide click.
 document.addEventListener("click", onHideClick, true);
 
-// Clicks inside the iframe never reach this document, so any click here outside the button closes the panel.
-document.addEventListener("click", (e) => {
-  if (!e.target.closest?.(`#${BUTTON_ID}, #${PANEL_ID}`)) closePanel();
+// Close on any press outside the panel. Capture on window runs before YouTube's handlers, many of which
+// (e.g. channel tabs) stop click propagation, so a bubbling document "click" listener sometimes never fired.
+// Presses inside the panel's iframe never reach this document, so they don't close it.
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (!e.target.closest?.(`#${BUTTON_ID}, #${PANEL_ID}`)) closePanel();
+  },
+  true,
+);
+// A press inside some other iframe (e.g. an embed) never reaches this document either; window blur is the only signal.
+window.addEventListener("blur", () => {
+  setTimeout(() => {
+    if (!document.activeElement?.closest?.(`#${PANEL_ID}`)) closePanel();
+  });
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closePanel();
