@@ -191,7 +191,21 @@ function groupRow(group, avatars) {
     saveExpanded();
     renderGroupsSection();
   });
-  const row = h("div", { className: "yth-group" + (active ? " yth-active" : "") }, h("div", { className: "yth-group-head" }, open, toggle));
+  // Eye: whether this group's channels show in the plain Subscriptions feed (struck through = hidden from it).
+  const hidden = Boolean(group.hideFromFeed);
+  const eye = h("button", {
+    type: "button",
+    className: "yth-group-eye",
+    title: hidden ? "Hidden from the Subscriptions feed. Click to show it there again" : "Click to hide this group from the Subscriptions feed",
+  }, icon(hidden ? EYE_OFF_PATH : EYE_PATH));
+  eye.setAttribute("aria-pressed", String(hidden));
+  eye.setAttribute("aria-label", `Hide ${group.name} from the Subscriptions feed`);
+  eye.addEventListener("click", () => saveChannelGroups(setGroupHideFromFeed(channelGroups, group.id, !hidden)));
+  const row = h(
+    "div",
+    { className: "yth-group" + (active ? " yth-active" : "") + (hidden ? " yth-feed-hidden" : "") },
+    h("div", { className: "yth-group-head" }, open, eye, toggle),
+  );
   if (expanded) {
     const list = group.channels.length
       ? group.channels.map((c) => channelRow(c, avatars, group))

@@ -103,7 +103,12 @@ html[data-yth-peek] #yth-group-bar { top: 116px; } /* below the peek bar */
 .yth-group-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .yth-group-count { color: var(--yth-fg2); font-size: 12px; }
 .yth-active .yth-group-open { background: var(--yth-tint-strong); font-weight: 500; }
-.yth-group-toggle { justify-content: center; width: 32px; height: 32px; border-radius: 50%; }
+.yth-group-toggle, .yth-group-eye { justify-content: center; flex: none; width: 32px; height: 32px; border-radius: 50%; }
+/* Eye: shown on hover, and always when the group is hidden from the Subscriptions feed so that state is visible. */
+.yth-group-eye svg { width: 18px; height: 18px; fill: currentColor; }
+.yth-group-eye { opacity: 0; }
+.yth-group-head:hover .yth-group-eye, .yth-group-eye:focus-visible, .yth-feed-hidden .yth-group-eye { opacity: 1; }
+.yth-feed-hidden .yth-group-eye { color: var(--yth-fg2); }
 .yth-group-toggle svg { width: 20px; height: 20px; transition: transform 0.15s; }
 .yth-group-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
 .yth-group-channels { padding-left: 24px; }
