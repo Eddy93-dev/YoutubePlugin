@@ -242,17 +242,23 @@ function ensureGuidePickButtons() {
   }
 }
 
+// YouTube keeps earlier pages in the DOM, hidden (e.g. the "You" page also has a #page-header), so look only
+// inside the channel page that is showing.
+function channelPageHeader() {
+  return document.querySelector('ytd-browse[page-subtype="channels"]:not([hidden]) #page-header');
+}
+
 function currentPageChannel() {
   const key = channelKey(location.pathname);
   if (!key) return null; // old /c/ and /user/ URLs: no stable key
-  const name = document.querySelector("#page-header h1")?.textContent.trim() || `@${key}`;
+  const name = channelPageHeader()?.querySelector("h1")?.textContent.trim() || `@${key}`;
   return { key, name };
 }
 
 // "Groups" button next to Subscribe on channel pages; its label lists the groups the channel is in.
 function ensureChannelPageButton() {
   const channel = pageKey(location.pathname) === "filterChannel" ? currentPageChannel() : null;
-  const actions = document.querySelector("#page-header yt-flexible-actions-view-model");
+  const actions = channelPageHeader()?.querySelector("yt-flexible-actions-view-model");
   if (!channel || !actions) return;
   let button = document.getElementById(CHANNEL_BUTTON_ID);
   if (!button) {
@@ -260,7 +266,10 @@ function ensureChannelPageButton() {
     button.id = CHANNEL_BUTTON_ID;
     button.append(h("span"));
   }
-  if (button.parentElement?.parentElement !== actions) actions.append(h("div", { className: "ytFlexibleActionsViewModelAction" }, button));
+  if (button.parentElement?.parentElement !== actions) {
+    button.parentElement?.remove(); // our wrapper in a header YouTube re-rendered or replaced
+    actions.append(h("div", { className: "ytFlexibleActionsViewModelAction" }, button));
+  }
   const names = groupsForChannel(channelGroups, channel.key).map((g) => g.name);
   const label = names.length ? names.join(", ") : "Add to group";
   if (button.lastChild.textContent !== label) button.lastChild.textContent = label;
