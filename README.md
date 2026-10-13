@@ -46,11 +46,11 @@ Settings are grouped into collapsible sections; each header shows what's current
 <table>
   <tr>
     <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, 3 channel groups, Shorts, shelves and ads hidden, 5 videos per row"></td>
-    <td align="center"><img src="docs/screenshots/settings-groups.png" width="300" alt="Channel groups section in dark theme: Gaming, Coding and Languages groups, Coding expanded with its four channels and a field to add more, and Clicking a group shows set to Latest uploads"></td>
+    <td align="center"><img src="docs/screenshots/settings-groups.png" width="300" alt="Channel groups section in dark theme: Gaming, Coding and Languages groups, Gaming expanded with Hide from the Subscriptions feed ticked, its three channels and a field to add more, and Clicking a group shows set to Latest uploads"></td>
   </tr>
   <tr>
     <td align="center">Gray out at 60%, keyword, channel, age and type filters, 3 channel groups, clean-up, 5 per row</td>
-    <td align="center">Channel groups: manage groups and their channels, choose how a group opens</td>
+    <td align="center">Channel groups: manage groups and their channels, hide a group from the main feed, choose how a group opens</td>
   </tr>
 </table>
 
