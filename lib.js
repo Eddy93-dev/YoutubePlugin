@@ -86,12 +86,18 @@ function pageKey(pathname) {
 
 const normalizeChannel = (s) => s.trim().toLowerCase().replace(/^@/, "");
 
-// "/@Handle/videos" → "handle", "/channel/UC123" → "uc123".
+// "/@Handle/videos" → "Handle", "/channel/UC123" → "UC123". Case is kept (channel ids are case-sensitive in
+// URLs); comparisons go through normalizeChannel.
 function channelKey(pathname) {
   const [first, second] = pathname.split("/").filter(Boolean);
-  if (first?.startsWith("@")) return normalizeChannel(decodeURIComponent(first));
-  if (first === "channel" && second) return normalizeChannel(second);
+  if (first?.startsWith("@")) return decodeURIComponent(first).slice(1).trim() || null;
+  if (first === "channel" && second) return second;
   return null;
+}
+
+// Inverse of channelKey: a channel's URL path.
+function channelHref(key) {
+  return /^UC[\w-]{22}$/.test(key) ? `/channel/${key}` : `/@${key}`;
 }
 
 function parseLines(text) {
@@ -257,9 +263,9 @@ function normalizeGroups(value) {
     const keys = new Set();
     const channels = [];
     for (const c of Array.isArray(g.channels) ? g.channels : []) {
-      const key = normalizeChannel(cleanText(c?.key));
-      if (!key || keys.has(key)) continue;
-      keys.add(key);
+      const key = cleanText(c?.key).replace(/^@/, "");
+      if (!key || keys.has(normalizeChannel(key))) continue;
+      keys.add(normalizeChannel(key));
       channels.push({ key, name: cleanText(c.name) || key });
     }
     groups.push({ id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) });
@@ -296,11 +302,11 @@ function moveGroup(groups, id, step) {
 
 // Adds (on) or removes the channel { key, name } in one group.
 function setChannelInGroup(groups, id, channel, on) {
-  const key = normalizeChannel(channel.key ?? "");
+  const key = cleanText(channel.key).replace(/^@/, "");
   if (!key) return groups;
   return groups.map((g) => {
     if (g.id !== id) return g;
-    const rest = g.channels.filter((c) => c.key !== key);
+    const rest = g.channels.filter((c) => normalizeChannel(c.key) !== normalizeChannel(key));
     if (!on) return { ...g, channels: rest };
     if (rest.length >= MAX_GROUP_CHANNELS) return g;
     return { ...g, channels: [...rest, { key, name: cleanText(channel.name) || key }] };
@@ -309,7 +315,7 @@ function setChannelInGroup(groups, id, channel, on) {
 
 function groupsForChannel(groups, key) {
   const k = normalizeChannel(key ?? "");
-  return groups.filter((g) => g.channels.some((c) => c.key === k));
+  return groups.filter((g) => g.channels.some((c) => normalizeChannel(c.key) === k));
 }
 
 // ids: what cardChannelIds() found on a card; matches a channel's handle/id or its display name.
@@ -366,6 +372,7 @@ if (typeof module !== "undefined") {
     shouldFilter,
     pageKey,
     channelKey,
+    channelHref,
     parseLines,
     channelInList,
     invalidKeywordLines,

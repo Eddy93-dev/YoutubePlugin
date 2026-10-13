@@ -7,6 +7,7 @@ Chrome extension (Manifest V3, no build step, no dependencies):
 - **Keyword filter:** hide videos whose title contains a word, or matches a `/pattern/` (regular expression).
 - **Age filter:** hide videos older than 1 day to 1 year (not on channel pages; reads YouTube's English "… ago" text).
 - **Video types:** hide live streams, upcoming premieres, members-only videos, and mixes/playlists.
+- **Channel groups:** sort your subscriptions into your own groups (Gaming, Coding, Languages…). Groups appear in YouTube's left sidebar above Subscriptions; click one to see only its channels' videos on Subscriptions, expand it to jump to a channel. A channel can be in several groups. Manage groups with the sidebar's + button or the settings panel (add channels by @handle or URL). Stored on this device and included in backups.
 - **Channel blocklist:** always hide videos from channels you list (by `@handle` or name).
 - **Never hide:** channels you list are never hidden by any automatic filter.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
@@ -69,3 +70,6 @@ GitHub Release with the zip attached. Pushing a version bump is all it takes to 
 YouTube changes its markup often. A few seconds after each video page loads, the extension checks whether its
 selectors still match (videos, watched-progress bars, the settings button) and shows a warning at the top of
 the settings panel if not. To fix, update the `SEL` selectors at the top of `content.js`.
+Channel groups live in `groups.js`; their sidebar section is appended inside the guide's Home/Shorts section
+(`ytd-guide-section-renderer` holding the `href="/"` entry), because YouTube re-orders the guide when foreign nodes
+sit between its sections.

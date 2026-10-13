@@ -22,7 +22,8 @@ const SEL = {
   videoLink: 'a[href^="/watch?"], a[href^="/shorts/"]',
 };
 const ANY_CARD = `${SEL.card}, ${SEL.lockup}`;
-const CLASSES = ["yth-hidden", "yth-dimmed"];
+// yth-group-out: outside the channel group Subscriptions is filtered to (a view, not a filter: no stats, badge or peek).
+const CLASSES = ["yth-hidden", "yth-dimmed", "yth-group-out"];
 const CARD_CLASS = "yth-card"; // cards carrying our hide button (positioning + hover)
 const MIN_PER_ROW = 2;
 const MAX_PER_ROW = 10;
@@ -177,6 +178,10 @@ function syncHideButton(card, isManual) {
 // Decides one card's state from scratch. ctx holds values that are the same for every card in a pass.
 function processCard(card, ctx) {
   card.classList.remove(...CLASSES);
+  if (ctx.group && !groupMatches(ctx.group, cardChannelIds(card))) {
+    card.classList.add("yth-group-out");
+    return;
+  }
   const id = cardVideoId(card);
   const isManual = settings.manualEnabled && ctx.manualIds.has(id);
   syncHideButton(card, isManual);
@@ -422,6 +427,8 @@ function applyPageFlags() {
 function run() {
   scheduled = false;
   ensureSettingsButton();
+  ensureGroupsSection();
+  updateGroupBar();
   applyPageFlags();
   if (settings.hideShorts && location.pathname.startsWith("/shorts/")) {
     location.replace("/");
@@ -434,6 +441,7 @@ function run() {
     matchesKeyword: compileKeywords(settings.blockedKeywords),
     usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
     onChannelPage: pageKey(location.pathname) === "filterChannel",
+    group: activeGroup(),
     maxAgeDays: Number(settings.maxAgeDays) || 0,
     hiddenTypes: new Set(
       [
@@ -448,7 +456,7 @@ function run() {
     fullPassPending = false;
     pendingRoots.clear();
     // Clears shelves and guide entries too, so loosened settings un-hide them.
-    for (const el of document.querySelectorAll(".yth-hidden, .yth-dimmed")) el.classList.remove(...CLASSES);
+    for (const el of document.querySelectorAll(".yth-hidden, .yth-dimmed, .yth-group-out")) el.classList.remove(...CLASSES);
     processRoot(document.documentElement, ctx);
   } else {
     const roots = [...pendingRoots];

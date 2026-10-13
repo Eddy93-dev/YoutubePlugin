@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -201,9 +201,11 @@ test("pageKey recognizes channel pages and their tabs", () => {
   assert.strictEqual(pageKey("/c"), null);
 });
 
-test("channelKey extracts handles and channel ids", () => {
-  assert.strictEqual(channelKey("/@SomeOne/videos"), "someone");
-  assert.strictEqual(channelKey("/channel/UCabc"), "ucabc");
+test("channelKey extracts handles and channel ids, channelHref turns them back into paths", () => {
+  assert.strictEqual(channelKey("/@SomeOne/videos"), "SomeOne");
+  assert.strictEqual(channelHref("SomeOne"), "/@SomeOne");
+  assert.strictEqual(channelHref("UC-9-kyTW8ZkZNDHQJ6FgpwQ"), "/channel/UC-9-kyTW8ZkZNDHQJ6FgpwQ");
+  assert.strictEqual(channelKey("/channel/UCabc"), "UCabc");
   assert.strictEqual(channelKey("/watch"), null);
 });
 
@@ -256,7 +258,7 @@ test("normalizeGroups drops malformed entries and duplicates", () => {
     { id: "c", name: "No channels" },
   ]);
   assert.deepStrictEqual(groups, [
-    { id: "a", name: "Ok", channels: [{ key: "x", name: "X" }] },
+    { id: "a", name: "Ok", channels: [{ key: "X", name: "X" }] },
     { id: "c", name: "No channels", channels: [] },
   ]);
   assert.deepStrictEqual(normalizeGroups({ not: "an array" }), []);
