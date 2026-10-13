@@ -1,16 +1,38 @@
 // "Latest uploads" group view (settings: groupView = "feed"): instead of narrowing Subscriptions to a group, show the
-// group's channels' recent uploads, read from each channel's public uploads feed (15 newest each). Fast, and it
-// doesn't make YouTube page through the whole Subscriptions history. Shares globals with groups.js and content.js.
+// group's channels' uploads newest first, paged from each channel's Videos tab through YouTube's own browse API
+// (30 per page, more as you scroll). Shares globals with groups.js and content.js.
 const GROUP_FEED_ID = "yth-group-feed";
-const FEED_TTL_MS = 10 * 60 * 1000;
 const FEED_CONCURRENCY = 6;
-const FEED_MAX_VIDEOS = 300;
+const FEED_STEP = 36; // cards added per scroll step
+const FEED_PRELOAD_PX = 1200; // start loading this far before the bottom is reached
 
-const feedCache = new Map(); // channel id → { at, videos }
 let feedLoadToken = 0;
+let innertubeVersion = null;
 
 function groupFeedActive() {
   return settings.groupView === "feed" && activeGroup() !== null;
+}
+
+// YouTube's web client version, from the page's inline config; the browse API wants it.
+function clientVersion() {
+  innertubeVersion ??= [...document.scripts]
+    .map((s) => s.textContent.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/)?.[1])
+    .find(Boolean);
+  if (!innertubeVersion) throw new Error("no client version");
+  return innertubeVersion;
+}
+
+async function browse(body) {
+  const context = { client: { clientName: "WEB", clientVersion: clientVersion(), hl: "en" } }; // English "… ago"
+  const res = await fetch("/youtubei/v1/browse?prettyPrint=false", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ context, ...body }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return json;
 }
 
 // The channel's UC… id: its key may already be one; otherwise read once from its page and remember it.
@@ -25,44 +47,58 @@ async function resolveChannelId(channel) {
   return id;
 }
 
-async function channelUploads(channel) {
-  const id = await resolveChannelId(channel);
-  const cached = feedCache.get(id);
-  if (cached && Date.now() - cached.at < FEED_TTL_MS) return cached.videos;
+// Fallback when the Videos tab can't be read: the public uploads feed (15 newest, exact dates).
+async function channelUploads(channel, id) {
   const res = await fetch(`/feeds/videos.xml?channel_id=${id}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const videos = parseChannelFeed(await res.text()).map((v) => ({ ...v, channel }));
-  feedCache.set(id, { at: Date.now(), videos });
-  return videos;
+  return parseChannelFeed(await res.text()).map((v) => ({ ...v, channel, viewsText: formatViews(v.views) }));
 }
 
-// Runs fn over items with at most `limit` in flight; onEach after every item, success or not.
-async function forEachLimited(items, limit, fn, onEach) {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const item = items[next++];
-      try {
-        await fn(item);
-      } finally {
-        onEach();
-      }
+// Loads one more page of a channel (cs: { channel, id, videos, token, started, exhausted, failed }).
+async function loadNextPage(cs) {
+  try {
+    cs.id ??= await resolveChannelId(cs.channel);
+    const json = await browse(cs.started ? { continuation: cs.token } : { browseId: cs.id, params: VIDEOS_TAB_PARAMS });
+    const { videos, token } = parseBrowseVideos(json);
+    if (!cs.started && !videos.length) throw new Error("no videos tab"); // e.g. a Shorts-only channel
+    const before = cs.videos.length;
+    cs.videos = appendChannelPage(cs.videos, videos.map((v) => ({ ...v, channel: cs.channel })), Date.now());
+    cs.started = true;
+    cs.token = token;
+    cs.exhausted = !token || cs.videos.length === before; // no progress: stop rather than loop
+  } catch {
+    cs.exhausted = true;
+    if (cs.started) return; // keep what's loaded
+    try {
+      cs.videos = await channelUploads(cs.channel, cs.id);
+      cs.started = true;
+    } catch {
+      cs.failed = true; // listed in the header; the rest still load
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  }
 }
 
-function feedCard(video, now) {
+// Videos safe to show (see feedCutoff), newest first.
+function visibleVideos(state) {
+  const cutoff = feedCutoff(state.channels);
+  return state.channels
+    .flatMap((cs) => cs.videos)
+    .filter((v) => v.published >= cutoff && !(settings.hideShorts && v.isShort))
+    .sort((a, b) => b.published - a.published);
+}
+
+function feedCard(video) {
   const href = `/watch?v=${video.videoId}`;
   const thumb = h(
     "a",
     { className: "yth-feed-thumb", href },
     h("img", { src: `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg`, alt: "", loading: "lazy" }),
   );
-  if (video.isShort) thumb.append(h("span", { className: "yth-feed-badge", textContent: "Short" }));
+  const badge = video.isShort ? "Short" : video.duration;
+  if (badge) thumb.append(h("span", { className: "yth-feed-badge", textContent: badge }));
   const title = h("a", { className: "yth-feed-title", href, title: video.title, textContent: video.title });
   const channel = h("a", { className: "yth-feed-channel", href: channelHref(video.channel.key), textContent: video.channel.name });
-  const meta = [formatViews(video.views), formatAge(video.published, now)].filter(Boolean).join(" · ");
+  const meta = [video.viewsText, video.ageText || formatAge(video.published, Date.now())].filter(Boolean).join(" · ");
   const card = h("div", { className: "yth-feed-card" }, thumb, h("div", { className: "yth-feed-meta" }, title, channel, h("span", { textContent: meta })));
   for (const link of card.querySelectorAll("a")) {
     link.addEventListener("click", (e) => {
@@ -74,57 +110,89 @@ function feedCard(video, now) {
   return card;
 }
 
-// Cards are re-rendered as each channel arrives; reusing them keeps thumbnails from reloading every time.
-function cachedCard(state, video, now) {
+// Cards are re-rendered as pages arrive; reusing them keeps thumbnails from reloading every time.
+function cachedCard(state, video) {
   let card = state.cards.get(video.videoId);
   if (!card) {
-    card = feedCard(video, now);
+    card = feedCard(video);
     state.cards.set(video.videoId, card);
   }
   return card;
 }
 
-function renderGroupFeed(feed, group, state) {
-  const now = Date.now();
-  const videos = state.videos
-    .filter((v) => !(settings.hideShorts && v.isShort))
-    .sort((a, b) => b.published - a.published)
-    .slice(0, FEED_MAX_VIDEOS);
-  const total = group.channels.length;
-  const loading = state.done < total;
+function renderGroupFeed(state) {
+  const { feed, group, channels } = state;
+  const videos = visibleVideos(state);
+  const total = channels.length;
+  const ready = channels.filter((cs) => cs.started || cs.exhausted).length;
+  const everything = channels.every((cs) => cs.exhausted);
+  const failed = channels.filter((cs) => cs.failed).map((cs) => cs.channel.name);
   const status = [
-    loading ? `Loading ${state.done} of ${total} channels…` : `${videos.length} recent uploads from ${total} channel${total === 1 ? "" : "s"}`,
-    state.failed.length ? `Couldn't load: ${state.failed.join(", ")}` : "",
+    ready < total ? `Loading ${ready} of ${total} channels…` : `${videos.length} videos from ${total} channel${total === 1 ? "" : "s"}`,
+    failed.length ? `Couldn't load: ${failed.join(", ")}` : "",
   ].filter(Boolean);
   const header = h("div", { className: "yth-feed-header" }, h("h2", { textContent: `${group.name} · latest uploads` }), h("p", { textContent: status.join(" · ") }));
   const children = [header];
   if (!total) children.push(h("p", { className: "yth-feed-empty", textContent: "This group has no channels yet." }));
-  else if (!videos.length && !loading) children.push(h("p", { className: "yth-feed-empty", textContent: "No uploads found." }));
-  children.push(h("div", { className: "yth-feed-grid" }, ...videos.map((v) => cachedCard(state, v, now))));
+  else if (!videos.length && everything) children.push(h("p", { className: "yth-feed-empty", textContent: "No uploads found." }));
+  children.push(h("div", { className: "yth-feed-grid" }, ...videos.map((v) => cachedCard(state, v))));
+  state.sentinel.textContent = state.filling ? "Loading more…" : everything && videos.length ? "That's everything." : "";
+  children.push(state.sentinel);
   feed.replaceChildren(...children);
 }
 
-async function loadGroupFeed(feed, group) {
-  const token = ++feedLoadToken;
-  const state = { videos: [], done: 0, failed: [], cards: new Map() };
-  renderGroupFeed(feed, group, state);
-  await forEachLimited(
-    group.channels,
-    FEED_CONCURRENCY,
-    async (channel) => {
-      try {
-        state.videos.push(...(await channelUploads(channel)));
-      } catch {
-        state.failed.push(channel.name); // shown in the header; the rest still load
-      }
-    },
-    () => {
-      state.done++;
-      if (token === feedLoadToken && feed.isConnected) renderGroupFeed(feed, group, state);
-    },
-  );
+function feedIsLive(state) {
+  return state.token === feedLoadToken && state.feed.isConnected;
 }
 
+function nearBottom(state) {
+  return state.sentinel.getBoundingClientRect().top < innerHeight + FEED_PRELOAD_PX;
+}
+
+// Loads pages of the channels furthest behind until `target` videos show and the bottom is out of reach.
+async function fillGroupFeed(state) {
+  if (state.filling) return;
+  state.filling = true;
+  renderGroupFeed(state);
+  try {
+    while (feedIsLive(state)) {
+      if (visibleVideos(state).length >= state.target && !nearBottom(state)) break;
+      const picks = channelsToLoad(state.channels, FEED_CONCURRENCY);
+      if (!picks.length) break;
+      await Promise.all(picks.map(loadNextPage));
+      if (feedIsLive(state)) renderGroupFeed(state);
+    }
+  } finally {
+    state.filling = false;
+    if (feedIsLive(state)) renderGroupFeed(state);
+    else state.observer.disconnect();
+  }
+}
+
+function loadGroupFeed(feed, group) {
+  const state = {
+    token: ++feedLoadToken,
+    feed,
+    group,
+    channels: group.channels.map((channel) => ({ channel, id: channel.id ?? null, videos: [], token: null, started: false, exhausted: false })),
+    cards: new Map(),
+    target: FEED_STEP,
+    filling: false,
+    sentinel: h("div", { className: "yth-feed-sentinel" }),
+  };
+  // More as the bottom comes into reach.
+  state.observer = new IntersectionObserver(
+    (entries) => {
+      if (!feedIsLive(state)) return state.observer.disconnect();
+      if (!entries.some((e) => e.isIntersecting)) return;
+      state.target = visibleVideos(state).length + FEED_STEP;
+      fillGroupFeed(state);
+    },
+    { rootMargin: `0px 0px ${FEED_PRELOAD_PX}px 0px` },
+  );
+  state.observer.observe(state.sentinel);
+  fillGroupFeed(state);
+}
 // Called from ensureGroupsUI() on every pass: shows, refreshes or removes the feed view.
 function updateGroupFeed() {
   const on = groupFeedActive();

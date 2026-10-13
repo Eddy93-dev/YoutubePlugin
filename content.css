@@ -181,6 +181,7 @@ html[data-yth-group-feed] ytd-browse[page-subtype="subscriptions"] #primary > yt
   -webkit-line-clamp: 2;
 }
 .yth-feed-channel:hover { color: var(--yth-fg) !important; }
+.yth-feed-sentinel { min-height: 1px; padding: 24px 0; color: var(--yth-fg2); text-align: center; }
 .yth-feed-card a:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; border-radius: 4px; }
 
 /* Folder buttons that open the group picker. */

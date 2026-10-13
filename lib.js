@@ -315,6 +315,100 @@ function parseChannelFeed(xml) {
     .filter((v) => VIDEO_ID.test(v.videoId) && Number.isFinite(v.published));
 }
 
+// --- Paging a channel's Videos tab through YouTube's own browse API (what its pages use to load more) ---
+const VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA";
+const DAY_MS = 86400000;
+
+// First value of `key` anywhere inside o (depth-first), or undefined.
+function findKey(o, key) {
+  if (!o || typeof o !== "object") return undefined;
+  if (key in o) return o[key];
+  for (const v of Object.values(o)) {
+    const found = findKey(v, key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+function lockupVideo(lockup) {
+  const meta = lockup.metadata?.lockupMetadataViewModel;
+  const parts = (meta?.metadata?.contentMetadataViewModel?.metadataRows ?? [])
+    .flatMap((row) => row.metadataParts ?? [])
+    .map((part) => part.text?.content ?? "");
+  const videoId = lockup.contentId;
+  const title = meta?.title?.content ?? "";
+  if (!VIDEO_ID.test(videoId ?? "") || !title) return null;
+  return {
+    videoId,
+    title,
+    ageText: parts.find((t) => parseAgeDays(t) !== null) ?? "",
+    viewsText: parts.find((t) => /\bviews?\b/i.test(t)) ?? "",
+    duration: findKey(lockup.contentImage, "thumbnailBadgeViewModel")?.text ?? "",
+  };
+}
+
+// One browse response (first page or continuation) → { videos: [{ videoId, title, ageText, viewsText, duration }],
+// token } where token fetches the next page (null at the end). Only the continuation that sits in the same list as
+// the videos counts: side panels (e.g. the channel's About panel) carry continuations of their own.
+function parseBrowseVideos(json) {
+  const videos = [];
+  let token = null;
+  const walk = (o) => {
+    if (!o || typeof o !== "object") return;
+    if (Array.isArray(o)) {
+      const isVideoList = o.some((item) => item?.richItemRenderer);
+      for (const item of o) {
+        if (isVideoList && item?.continuationItemRenderer) {
+          token = findKey(item.continuationItemRenderer, "continuationCommand")?.token ?? token;
+        } else walk(item);
+      }
+      return;
+    }
+    if (o.lockupViewModel?.contentType === "LOCKUP_CONTENT_TYPE_VIDEO") {
+      const video = lockupVideo(o.lockupViewModel);
+      if (video) videos.push(video);
+      return;
+    }
+    for (const v of Object.values(o)) walk(v);
+  };
+  walk(json);
+  return { videos, token };
+}
+
+// Appends a page of a channel's videos (newest first) to what's loaded: skips ones already there and dates each
+// from its "… ago" text, kept strictly older than the one before so the channel's order survives coarse ages.
+function appendChannelPage(loaded, page, now) {
+  const seen = new Set(loaded.map((v) => v.videoId));
+  const out = [...loaded];
+  for (const video of page) {
+    if (seen.has(video.videoId)) continue;
+    seen.add(video.videoId);
+    const days = parseAgeDays(video.ageText);
+    const approx = days === null ? now : now - days * DAY_MS;
+    const last = out[out.length - 1];
+    out.push({ ...video, published: last ? Math.min(approx, last.published - 1) : approx });
+  }
+  return out;
+}
+
+// Group feed paging over channels [{ videos (newest first), exhausted }]. A video is safe to show once no channel can
+// still have an unloaded video newer than it: everything at or after the oldest loaded video of the channel that is
+// furthest behind. So the list only ever grows at the bottom. -Infinity when every channel is fully loaded.
+function feedCutoff(channels) {
+  const open = channels.filter((c) => !c.exhausted);
+  if (!open.length) return -Infinity;
+  return Math.max(...open.map((c) => (c.videos.length ? c.videos[c.videos.length - 1].published : Infinity)));
+}
+
+// The channels holding the cutoff back (furthest behind first), to load their next page.
+function channelsToLoad(channels, limit) {
+  const oldest = (c) => (c.videos.length ? c.videos[c.videos.length - 1].published : Infinity);
+  return channels
+    .filter((c) => !c.exhausted)
+    .sort((a, b) => oldest(b) - oldest(a))
+    .slice(0, limit);
+}
+
 // "3 days ago", like YouTube's cards.
 function formatAge(ms, now) {
   const seconds = Math.max(0, (now - ms) / 1000);
@@ -486,5 +580,10 @@ if (typeof module !== "undefined") {
     parseChannelFeed,
     formatAge,
     formatViews,
+    VIDEOS_TAB_PARAMS,
+    parseBrowseVideos,
+    appendChannelPage,
+    feedCutoff,
+    channelsToLoad,
   };
 }

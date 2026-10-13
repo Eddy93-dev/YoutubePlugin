@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews, parseBrowseVideos, appendChannelPage, feedCutoff, channelsToLoad } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -319,4 +319,62 @@ test("formatAge and formatViews read like YouTube's cards", () => {
   assert.strictEqual(formatViews(82000), "82K views");
   assert.strictEqual(formatViews(1250000), "1.3M views");
   assert.strictEqual(formatViews(NaN), "");
+});
+
+test("parseBrowseVideos reads lockups from a Videos tab page and its continuation token", () => {
+  const lockup = (id, title, age, views, duration) => ({
+    richItemRenderer: {
+      content: {
+        lockupViewModel: {
+          contentId: id,
+          contentType: "LOCKUP_CONTENT_TYPE_VIDEO",
+          contentImage: { thumbnailViewModel: { overlays: [{ thumbnailBottomOverlayViewModel: { badges: [{ thumbnailBadgeViewModel: { text: duration } }] } }] } },
+          metadata: { lockupMetadataViewModel: { title: { content: title }, metadata: { contentMetadataViewModel: { metadataRows: [{ metadataParts: [{ text: { content: views } }, { text: { content: age } }] }] } } } },
+        },
+      },
+    },
+  });
+  const json = {
+    contents: { richGridRenderer: { contents: [
+      lockup("6uYOnnz8o0g", "Flower", "10 days ago", "157K views", "26:07"),
+      lockup("abcdefghijk", "Old stream", "Streamed 2 years ago", "1.2K views", "1:02:03"),
+      { richItemRenderer: { content: { lockupViewModel: { contentId: "PLx", contentType: "LOCKUP_CONTENT_TYPE_PLAYLIST" } } } },
+      { continuationItemRenderer: { continuationEndpoint: { commandExecutorCommand: { commands: [{ continuationCommand: { token: "NEXT" } }] } } } },
+    ] } },
+    // A side panel with its own continuation, after the grid: must not replace the grid's token.
+    engagementPanels: [{ sectionListRenderer: { contents: [{ itemSectionRenderer: { contents: [{ continuationItemRenderer: { continuationEndpoint: { continuationCommand: { token: "PANEL" } } } }] } }] } }],
+  };
+  assert.deepStrictEqual(parseBrowseVideos(json), {
+    videos: [
+      { videoId: "6uYOnnz8o0g", title: "Flower", ageText: "10 days ago", viewsText: "157K views", duration: "26:07" },
+      { videoId: "abcdefghijk", title: "Old stream", ageText: "Streamed 2 years ago", viewsText: "1.2K views", duration: "1:02:03" },
+    ],
+    token: "NEXT",
+  });
+  assert.deepStrictEqual(parseBrowseVideos({ error: { message: "bad" } }), { videos: [], token: null });
+});
+
+test("appendChannelPage dedupes and keeps a channel's order despite coarse ages", () => {
+  const now = Date.parse("2026-10-13T12:00:00Z");
+  const page = [
+    { videoId: "aaaaaaaaaaa", ageText: "1 week ago" },
+    { videoId: "bbbbbbbbbbb", ageText: "1 week ago" },
+    { videoId: "ccccccccccc", ageText: "Premieres soon" },
+  ];
+  const first = appendChannelPage([], page, now);
+  assert.deepStrictEqual(first.map((v) => v.published), [now - 7 * 86400000, now - 7 * 86400000 - 1, now - 7 * 86400000 - 2]);
+  const again = appendChannelPage(first, [{ videoId: "bbbbbbbbbbb", ageText: "1 week ago" }, { videoId: "ddddddddddd", ageText: "2 weeks ago" }], now);
+  assert.deepStrictEqual(again.map((v) => v.videoId), ["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc", "ddddddddddd"]);
+  assert.strictEqual(again[3].published, now - 14 * 86400000);
+});
+
+test("feedCutoff shows only what no channel can still beat; channelsToLoad picks the ones behind", () => {
+  const ch = (name, dates, exhausted = false) => ({ name, exhausted, videos: dates.map((published) => ({ published })) });
+  const busy = ch("busy", [100, 90, 80]); // loaded back to 80
+  const slow = ch("slow", [95, 20]); // loaded back to 20
+  const done = ch("done", [99], true);
+  assert.strictEqual(feedCutoff([busy, slow, done]), 80, "busy may still have videos between 20 and 80");
+  assert.deepStrictEqual(channelsToLoad([busy, slow, done], 1).map((c) => c.name), ["busy"]);
+  assert.strictEqual(feedCutoff([ch("pending", []), slow]), Infinity, "nothing shown until every channel has a page");
+  assert.strictEqual(feedCutoff([done]), -Infinity, "all loaded: show everything");
 });
