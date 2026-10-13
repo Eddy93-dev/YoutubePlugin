@@ -94,23 +94,63 @@ function saveExpanded() {
   storageSet(localStorage, EXPANDED_GROUPS_KEY, JSON.stringify([...expandedGroups]));
 }
 
-// Avatars of subscribed channels, from the guide's own entries (lowercased key → image URL).
+// Avatars of subscribed channels, from the guide's own entries: lowercased handle/id and display name → image URL.
+// By name too, because a channel added by hand may be stored under a different handle (filtering matches names too).
 function guideAvatars() {
   const avatars = new Map();
   for (const a of document.querySelectorAll("ytd-guide-renderer ytd-guide-entry-renderer a#endpoint[href]")) {
     const key = channelKey(a.getAttribute("href"));
     const src = a.querySelector("img")?.src;
-    if (key && src) avatars.set(key.toLowerCase(), src);
+    if (!key || !src) continue;
+    avatars.set(key.toLowerCase(), src);
+    if (a.title) avatars.set(a.title.trim().toLowerCase(), src);
   }
   return avatars;
 }
 
+function lookupAvatar(avatars, key, name) {
+  return avatars.get(key.toLowerCase()) ?? avatars.get(name.trim().toLowerCase());
+}
+
+// The channel's initial, until (or unless) a picture is known.
+function avatarPlaceholder(channel) {
+  const span = h("span", { className: "yth-group-avatar", textContent: channel.name.replace(/^@/, "").charAt(0).toUpperCase() });
+  span.dataset.key = channel.key;
+  span.dataset.name = channel.name;
+  return span;
+}
+
+function avatarImage(channel, src) {
+  const img = h("img", { className: "yth-group-avatar", src, alt: "" });
+  img.addEventListener(
+    "error",
+    () => {
+      const fallback = avatarPlaceholder(channel);
+      delete fallback.dataset.key; // broken picture: don't retry it on every pass
+      img.replaceWith(fallback);
+    },
+    { once: true },
+  );
+  return img;
+}
+
+// Guide pictures load lazily (and "Show more" entries appear later): swap placeholders as pictures turn up.
+function fillAvatarPlaceholders(section) {
+  const waiting = section.querySelectorAll("span.yth-group-avatar[data-key]");
+  if (!waiting.length) return;
+  const avatars = guideAvatars();
+  for (const span of waiting) {
+    const channel = { key: span.dataset.key, name: span.dataset.name };
+    const src = lookupAvatar(avatars, channel.key, channel.name);
+    if (src) span.replaceWith(avatarImage(channel, src));
+  }
+}
+
 function channelRow(channel, avatars) {
   const href = channelHref(channel.key);
-  const src = avatars.get(channel.key.toLowerCase());
-  const avatar = src
-    ? h("img", { className: "yth-group-avatar", src, alt: "" })
-    : h("span", { className: "yth-group-avatar", textContent: channel.name.replace(/^@/, "").charAt(0).toUpperCase() });
+  // Live guide picture first (current), then the one saved when the channel was added.
+  const src = lookupAvatar(avatars, channel.key, channel.name) ?? channel.avatar;
+  const avatar = src ? avatarImage(channel, src) : avatarPlaceholder(channel);
   const link = h("a", { className: "yth-group-channel", href, title: channel.name }, avatar, h("span", { textContent: channel.name }));
   link.addEventListener("click", (e) => {
     if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return; // let new-tab clicks through
@@ -185,7 +225,7 @@ function ensureGroupsSection() {
   const home = document.querySelector('ytd-guide-renderer #sections a#endpoint[href="/"]')?.closest("ytd-guide-section-renderer");
   if (!home) return;
   let section = document.getElementById(GROUPS_SECTION_ID);
-  if (section?.parentElement === home && !section.nextElementSibling) return;
+  if (section?.parentElement === home && !section.nextElementSibling) return fillAvatarPlaceholders(section);
   section ??= h("div", { id: GROUPS_SECTION_ID });
   home.append(section);
   renderGroupsSection();
@@ -251,8 +291,10 @@ function channelPageHeader() {
 function currentPageChannel() {
   const key = channelKey(location.pathname);
   if (!key) return null; // old /c/ and /user/ URLs: no stable key
-  const name = channelPageHeader()?.querySelector("h1")?.textContent.trim() || `@${key}`;
-  return { key, name };
+  const header = channelPageHeader();
+  const name = header?.querySelector("h1")?.textContent.trim() || `@${key}`;
+  const avatar = header?.querySelector("yt-avatar-shape img, yt-decorated-avatar-view-model img")?.src;
+  return { key, name, avatar };
 }
 
 // "Groups" button next to Subscribe on channel pages; its label lists the groups the channel is in.
@@ -320,7 +362,7 @@ function channelForPickButton(button) {
   if (button.id === CHANNEL_BUTTON_ID) return currentPageChannel();
   const link = button.closest("ytd-guide-entry-renderer")?.querySelector("a#endpoint");
   const key = link && channelKey(link.getAttribute("href"));
-  return key ? { key, name: link.title || `@${key}` } : null;
+  return key ? { key, name: link.title || `@${key}`, avatar: link.querySelector("img")?.src } : null;
 }
 
 // Capture phase, so the guide entry's own link and ripple never see clicks on our button.

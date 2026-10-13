@@ -263,3 +263,15 @@ test("normalizeGroups drops malformed entries and duplicates", () => {
   ]);
   assert.deepStrictEqual(normalizeGroups({ not: "an array" }), []);
 });
+
+test("channel avatars are kept only from YouTube's image hosts and survive re-adding", () => {
+  const ok = "https://yt3.ggpht.com/abc=s88-c-k-c0x00ffffff-no-rj";
+  let groups = [{ id: "a", name: "Tech", channels: [] }];
+  groups = setChannelInGroup(groups, "a", { key: "one", name: "One", avatar: ok }, true);
+  groups = setChannelInGroup(groups, "a", { key: "two", name: "Two", avatar: "https://evil.example/x.png" }, true);
+  assert.deepStrictEqual(groups[0].channels, [{ key: "one", name: "One", avatar: ok }, { key: "two", name: "Two" }]);
+  const readded = setChannelInGroup(groups, "a", { key: "One", name: "One renamed" }, true);
+  assert.deepStrictEqual(readded[0].channels[0], { key: "One", name: "One renamed", avatar: ok }, "keeps place and avatar");
+  const imported = normalizeGroups([{ id: "a", name: "T", channels: [{ key: "x", avatar: "javascript:alert(1)" }, { key: "y", avatar: ok }] }]);
+  assert.deepStrictEqual(imported[0].channels, [{ key: "x", name: "x" }, { key: "y", name: "y", avatar: ok }]);
+});

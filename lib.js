@@ -250,6 +250,23 @@ const MAX_GROUP_CHANNELS = 500;
 
 const cleanText = (v) => (typeof v === "string" ? v.trim().slice(0, MAX_LINE_LENGTH) : "");
 
+// Channel avatar URL, only from YouTube's image hosts (imported backups are untrusted); "" otherwise.
+function cleanAvatar(v) {
+  if (typeof v !== "string" || v.length > 1000) return "";
+  try {
+    const url = new URL(v);
+    return url.protocol === "https:" && /^yt\d\.(ggpht|googleusercontent)\.com$/.test(url.hostname) ? v : "";
+  } catch {
+    return "";
+  }
+}
+
+// { key, name } plus avatar when one is known.
+function makeChannel(key, name, avatar) {
+  const clean = cleanAvatar(avatar);
+  return clean ? { key, name, avatar: clean } : { key, name };
+}
+
 // Validates stored or imported groups (may be untrusted): drops malformed entries and duplicates, caps sizes.
 function normalizeGroups(value) {
   if (!Array.isArray(value)) return [];
@@ -266,7 +283,7 @@ function normalizeGroups(value) {
       const key = cleanText(c?.key).replace(/^@/, "");
       if (!key || keys.has(normalizeChannel(key))) continue;
       keys.add(normalizeChannel(key));
-      channels.push({ key, name: cleanText(c.name) || key });
+      channels.push(makeChannel(key, cleanText(c.name) || key, c.avatar));
     }
     groups.push({ id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) });
     if (groups.length === MAX_GROUPS) break;
@@ -300,7 +317,7 @@ function moveGroup(groups, id, step) {
   return next;
 }
 
-// Adds (on) or removes the channel { key, name } in one group.
+// Adds (on) or removes the channel { key, name, avatar? } in one group. Re-adding refreshes name and avatar.
 function setChannelInGroup(groups, id, channel, on) {
   const key = cleanText(channel.key).replace(/^@/, "");
   if (!key) return groups;
@@ -309,7 +326,10 @@ function setChannelInGroup(groups, id, channel, on) {
     const rest = g.channels.filter((c) => normalizeChannel(c.key) !== normalizeChannel(key));
     if (!on) return { ...g, channels: rest };
     if (rest.length >= MAX_GROUP_CHANNELS) return g;
-    return { ...g, channels: [...rest, { key, name: cleanText(channel.name) || key }] };
+    const old = g.channels.find((c) => normalizeChannel(c.key) === normalizeChannel(key));
+    const added = makeChannel(key, cleanText(channel.name) || key, channel.avatar || old?.avatar);
+    // Keep its place when it was already in the group.
+    return { ...g, channels: old ? g.channels.map((c) => (c === old ? added : c)) : [...rest, added] };
   });
 }
 
