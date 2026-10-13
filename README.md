@@ -1,23 +1,37 @@
 # YouTube Watched Hider
 
-Chrome extension (Manifest V3, no build step, no dependencies):
+Chrome extension (Manifest V3, no build step, no dependencies) that cleans up YouTube: hides what you've already watched, filters out what you don't want, and sorts your subscriptions into groups.
 
+## Features
+
+### Filtering
 - **Watched videos:** hides or grays out videos you've watched past a threshold (default 80%) on Subscriptions, Home, Search, the watch-page sidebar and channel pages. Each page can be switched on or off.
 - **Manual hide:** hover a thumbnail and click the eye icon to hide that video everywhere, with Undo. They follow the Hide / Gray out choice; when grayed out, the same button becomes an eye icon that shows the video again. Switch "Hide videos I've hidden" off to show them again without losing the list. Each hide expires automatically 48 hours after you made it. Stored locally on this device.
 - **Keyword filter:** hide videos whose title contains a word, or matches a `/pattern/` (regular expression).
 - **Age filter:** hide videos older than 1 day to 1 year (not on channel pages; reads YouTube's English "… ago" text).
 - **Video types:** hide live streams, upcoming premieres, members-only videos, and mixes/playlists.
-- **Channel groups:** sort your subscriptions into your own groups (Gaming, Coding, Languages…). Groups appear in YouTube's left sidebar above Subscriptions; click one to see only its channels' videos on Subscriptions, expand it to jump to a channel, or hover a channel there and click × to take it out of the group. In settings, "Clicking a group shows" switches between that filtered Subscriptions feed and **Latest uploads**: the group's channels' uploads newest first, read page by page from each channel's Videos tab, with more loading as you scroll. It opens in a couple of seconds and doesn't make YouTube page through your whole Subscriptions history. Watched videos are hidden or grayed out by your Watched settings (the requests are signed in the same way YouTube's own pages sign them, so YouTube includes your watch progress), and manually hidden videos stay hidden. Older videos are ordered by YouTube's "… ago" text, so within the same week, month or year the order across channels is approximate. A channel can be in several groups. Add a channel with the folder button that appears when you hover it in the sidebar's Subscriptions list, or with the groups button next to Subscribe on its channel page. Create groups there, with the sidebar's + button, or in the settings panel (which can also rename, reorder and delete them, and add channels by @handle or URL). Stored on this device and included in backups.
 - **Channel blocklist:** always hide videos from channels you list (by `@handle` or name).
 - **Never hide:** channels you list are never hidden by any automatic filter.
 - **Shorts:** optionally hides Shorts shelves, Shorts cards and the sidebar entry, and redirects `/shorts/` pages to Home.
 - **Feed clean-up:** hide the add-on shelves on Home (news, trending, posts, Playables, Shorts…) and Subscriptions ("Most relevant"), and sponsored tiles and banners.
+
+### Channel groups
+Sort your subscriptions into your own groups (Gaming, Coding, Languages…) instead of scrolling one long list.
+
+- **In the sidebar:** groups appear in YouTube's left sidebar, above Subscriptions. Expand a group to see its channels and jump to one; hover a channel there and click × to take it out of the group.
+- **Adding channels:** hover a channel in the sidebar's Subscriptions list and click its folder button, or use the groups button next to Subscribe on a channel page. Both open a small menu with a checkbox per group and a field to create a new one. A channel can be in several groups. Groups can also be created with the sidebar's + button, and managed in settings (rename, reorder, delete, add channels by `@handle` or URL).
+- **Opening a group:** click it in the sidebar. Settings → Channel groups → "Clicking a group shows" picks the view:
+  - **Latest uploads** (recommended): the group's channels' uploads, newest first, with more loading as you scroll. It opens in a couple of seconds. Watched videos are hidden or grayed out by your Watched settings, with YouTube's red watched bar on each card, and manually hidden videos stay hidden. Older videos are ordered by YouTube's "… ago" text, so within the same week, month or year the order across channels is approximate.
+  - **Subscriptions, filtered:** YouTube's own Subscriptions feed with every other channel hidden. All your filters apply, but with small groups YouTube keeps loading older pages to fill the screen, so it can be slow.
+- **Storage:** groups are stored on this device and included in backups.
+
+### Layout and tools
 - **Tile size:** choose how many videos per row (Auto or 3–8) for smaller thumbnails on Home, Subscriptions and channel pages.
-- **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Settings button:** a button next to YouTube's search bar opens the settings in a panel, so you don't need to pin the extension.
+- **Badge:** the toolbar icon shows how many items were hidden on the current page.
 - **Stats:** how many videos were filtered today, this week and this month, broken down by reason.
 - **Layout warning:** if YouTube changes its page structure so videos or watched bars are no longer recognized, settings shows a warning.
-- **Backup:** export all settings, lists and manually hidden videos to a JSON file, and import them on another computer.
+- **Backup:** export all settings, lists, channel groups and manually hidden videos to a JSON file, and import them on another computer.
 - **Keyboard:** <kbd>H</kbd> hides the video under the mouse (keep pressing to clear the videos that slide into its place; on a grayed-out video, H brings it back), <kbd>P</kbd> peeks at everything hidden (outlined, with a bar to exit). Can be switched off in settings.
 - **Shortcut:** `Alt+Shift+H` toggles the watched filter (change it at `chrome://extensions/shortcuts`).
 
@@ -28,12 +42,14 @@ Settings are grouped into collapsible sections; each header shows what's current
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/settings-light.png" width="300" alt="Settings panel in light theme with default settings: hide anything watched past 80% on all pages, no extra filters, stats for the last 30 days"></td>
-    <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, hide upcoming and playlists, Home clean-up on, 5 videos per row, Shorts hidden"></td>
+    <td align="center"><img src="docs/screenshots/settings-light.png" width="260" alt="Settings panel in light theme with default settings: hide anything watched past 80% on all pages, no extra filters, no channel groups"></td>
+    <td align="center"><img src="docs/screenshots/settings-dark.png" width="260" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, 3 channel groups, Shorts, shelves and ads hidden, 5 videos per row"></td>
+    <td align="center"><img src="docs/screenshots/settings-groups.png" width="260" alt="Channel groups section in dark theme: Gaming, Coding and Languages groups, Coding expanded with its four channels and a field to add more, and Clicking a group shows set to Latest uploads"></td>
   </tr>
   <tr>
     <td align="center">Defaults: hide anything watched past 80%</td>
-    <td align="center">Power setup: gray out at 60%, keyword, channel, age and type filters, Home clean-up, 5 per row, no Shorts</td>
+    <td align="center">Power setup: gray out at 60%, keyword, channel, age and type filters, 3 channel groups, clean-up, 5 per row</td>
+    <td align="center">Channel groups: manage groups and their channels, choose how a group opens</td>
   </tr>
 </table>
 
