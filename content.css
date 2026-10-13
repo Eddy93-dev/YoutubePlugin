@@ -37,8 +37,9 @@ html[data-yth-peek] :is(.yth-hidden, .yth-dimmed) {
 }
 #yth-peek-bar button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/* Home clean-up. Every rich section on Home is an injected shelf (news, trending, posts, Playables, Shorts…). */
-html[data-yth-hide-shelves][data-yth-page="filterHome"] ytd-rich-section-renderer { display: none !important; }
+/* Feed clean-up. Every rich section on Home and Subscriptions is an injected shelf
+   (news, trending, posts, Playables, Shorts, Subscriptions' "Most relevant"…); the plain grid has all the videos. */
+html[data-yth-hide-shelves]:is([data-yth-page="filterHome"], [data-yth-page="filterSubscriptions"]) ytd-rich-section-renderer { display: none !important; }
 /* Sponsored tiles and banners, on every page. */
 html[data-yth-hide-sponsored] :is(
   ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
