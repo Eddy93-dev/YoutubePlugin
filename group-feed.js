@@ -7,26 +7,46 @@ const FEED_STEP = 36; // cards added per scroll step
 const FEED_PRELOAD_PX = 1200; // start loading this far before the bottom is reached
 
 let feedLoadToken = 0;
-let innertubeVersion = null;
+let feedState = null; // the feed currently shown, for re-filtering when settings change
+let ytConfig = null;
 
 function groupFeedActive() {
   return settings.groupView === "feed" && activeGroup() !== null;
 }
 
-// YouTube's web client version, from the page's inline config; the browse API wants it.
-function clientVersion() {
-  innertubeVersion ??= [...document.scripts]
-    .map((s) => s.textContent.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/)?.[1])
-    .find(Boolean);
-  if (!innertubeVersion) throw new Error("no client version");
-  return innertubeVersion;
+// From the page's inline config (ytcfg): the web client version the API wants, and which signed-in account and
+// channel (brand accounts) this tab uses.
+function pageConfig() {
+  if (!ytConfig) {
+    const text = [...document.scripts].map((s) => s.textContent).find((t) => t.includes('"INNERTUBE_CLIENT_VERSION"')) ?? "";
+    const field = (name) => text.match(new RegExp(`"${name}":"([^"]*)"`))?.[1];
+    const version = field("INNERTUBE_CLIENT_VERSION");
+    if (!version) throw new Error("no client version");
+    ytConfig = { version, sessionIndex: field("SESSION_INDEX") ?? "0", pageId: field("DELEGATED_SESSION_ID") };
+  }
+  return ytConfig;
+}
+
+// Signed-in requests (like YouTube's own) get each video's watched progress. Without the cookie: anonymous.
+async function authHeaders() {
+  const cookie = (name) => document.cookie.split("; ").find((c) => c.startsWith(`${name}=`))?.slice(name.length + 1);
+  const sapisid = cookie("SAPISID") ?? cookie("__Secure-3PAPISID");
+  if (!sapisid) return {};
+  const { sessionIndex, pageId } = pageConfig();
+  const headers = {
+    Authorization: await sapisidHash(sapisid, location.origin, Math.floor(Date.now() / 1000)),
+    "X-Origin": location.origin,
+    "X-Goog-AuthUser": sessionIndex,
+  };
+  if (pageId) headers["X-Goog-PageId"] = pageId;
+  return headers;
 }
 
 async function browse(body) {
-  const context = { client: { clientName: "WEB", clientVersion: clientVersion(), hl: "en" } }; // English "… ago"
+  const context = { client: { clientName: "WEB", clientVersion: pageConfig().version, hl: "en" } }; // English "… ago"
   const res = await fetch("/youtubei/v1/browse?prettyPrint=false", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({ context, ...body }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -78,13 +98,32 @@ async function loadNextPage(cs) {
   }
 }
 
-// Videos safe to show (see feedCutoff), newest first.
-function visibleVideos(state) {
+// The same watched / manual-hide rules as the rest of the extension (the view lives on Subscriptions, so its
+// "Apply on" toggle counts), with the Hide / Gray out choice.
+function feedFilter() {
+  return {
+    watched: watchedFilterActive(),
+    threshold: settings.threshold,
+    dim: settings.mode === "dim",
+    manual: settings.manualEnabled ? activeHiddenIds(manualHidden, Date.now()) : new Set(),
+  };
+}
+
+function isFiltered(video, filter) {
+  return (filter.watched && video.watched !== null && video.watched !== undefined && shouldFilter(video.watched, filter.threshold)) || filter.manual.has(video.videoId);
+}
+
+// Videos safe to show (see feedCutoff), newest first; filtered ones are left out unless graying out.
+// Returns { videos, hidden } where hidden counts the ones left out.
+function visibleVideos(state, filter = feedFilter()) {
   const cutoff = feedCutoff(state.channels);
-  return state.channels
+  const all = state.channels
     .flatMap((cs) => cs.videos)
     .filter((v) => v.published >= cutoff && !(settings.hideShorts && v.isShort))
     .sort((a, b) => b.published - a.published);
+  if (filter.dim) return { videos: all, hidden: 0 };
+  const videos = all.filter((v) => !isFiltered(v, filter));
+  return { videos, hidden: all.length - videos.length };
 }
 
 function feedCard(video) {
@@ -96,6 +135,11 @@ function feedCard(video) {
   );
   const badge = video.isShort ? "Short" : video.duration;
   if (badge) thumb.append(h("span", { className: "yth-feed-badge", textContent: badge }));
+  if (video.watched > 0) {
+    const bar = h("span", { className: "yth-feed-progress" });
+    bar.style.width = `${Math.min(100, video.watched)}%`; // YouTube's red "watched" bar
+    thumb.append(bar);
+  }
   const title = h("a", { className: "yth-feed-title", href, title: video.title, textContent: video.title });
   const channel = h("a", { className: "yth-feed-channel", href: channelHref(video.channel.key), textContent: video.channel.name });
   const meta = [video.viewsText, video.ageText || formatAge(video.published, Date.now())].filter(Boolean).join(" · ");
@@ -122,15 +166,19 @@ function cachedCard(state, video) {
 
 function renderGroupFeed(state) {
   const { feed, group, channels } = state;
-  const videos = visibleVideos(state);
+  const filter = feedFilter();
+  state.filterKey = filterKey(filter);
+  const { videos, hidden } = visibleVideos(state, filter);
   const total = channels.length;
   const ready = channels.filter((cs) => cs.started || cs.exhausted).length;
   const everything = channels.every((cs) => cs.exhausted);
   const failed = channels.filter((cs) => cs.failed).map((cs) => cs.channel.name);
   const status = [
     ready < total ? `Loading ${ready} of ${total} channels…` : `${videos.length} videos from ${total} channel${total === 1 ? "" : "s"}`,
+    hidden ? `${hidden} watched or hidden` : "",
     failed.length ? `Couldn't load: ${failed.join(", ")}` : "",
   ].filter(Boolean);
+  for (const v of videos) cachedCard(state, v).classList.toggle("yth-feed-dimmed", filter.dim && isFiltered(v, filter)); // own class: content.js clears yth-dimmed on full passes
   const header = h("div", { className: "yth-feed-header" }, h("h2", { textContent: `${group.name} · latest uploads` }), h("p", { textContent: status.join(" · ") }));
   const children = [header];
   if (!total) children.push(h("p", { className: "yth-feed-empty", textContent: "This group has no channels yet." }));
@@ -139,6 +187,10 @@ function renderGroupFeed(state) {
   state.sentinel.textContent = state.filling ? "Loading more…" : everything && videos.length ? "That's everything." : "";
   children.push(state.sentinel);
   feed.replaceChildren(...children);
+}
+
+function filterKey(filter) {
+  return JSON.stringify([filter.watched, filter.threshold, filter.dim, [...filter.manual].sort()]);
 }
 
 function feedIsLive(state) {
@@ -156,7 +208,7 @@ async function fillGroupFeed(state) {
   renderGroupFeed(state);
   try {
     while (feedIsLive(state)) {
-      if (visibleVideos(state).length >= state.target && !nearBottom(state)) break;
+      if (visibleVideos(state).videos.length >= state.target && !nearBottom(state)) break;
       const picks = channelsToLoad(state.channels, FEED_CONCURRENCY);
       if (!picks.length) break;
       await Promise.all(picks.map(loadNextPage));
@@ -185,14 +237,16 @@ function loadGroupFeed(feed, group) {
     (entries) => {
       if (!feedIsLive(state)) return state.observer.disconnect();
       if (!entries.some((e) => e.isIntersecting)) return;
-      state.target = visibleVideos(state).length + FEED_STEP;
+      state.target = visibleVideos(state).videos.length + FEED_STEP;
       fillGroupFeed(state);
     },
     { rootMargin: `0px 0px ${FEED_PRELOAD_PX}px 0px` },
   );
   state.observer.observe(state.sentinel);
+  feedState = state;
   fillGroupFeed(state);
 }
+
 // Called from ensureGroupsUI() on every pass: shows, refreshes or removes the feed view.
 function updateGroupFeed() {
   const on = groupFeedActive();
@@ -215,7 +269,14 @@ function updateGroupFeed() {
   const group = activeGroup();
   // Reload when the group or its channels change (or Shorts hiding is toggled), not on every pass.
   const signature = JSON.stringify([group.id, group.channels.map((c) => c.key), settings.hideShorts]);
-  if (feed.dataset.signature === signature) return;
+  if (feed.dataset.signature === signature) {
+    // Same videos; watched / manual-hide settings may have changed: re-filter, and top up if more got hidden.
+    if (feedState?.feed === feed && feedIsLive(feedState) && feedState.filterKey !== filterKey(feedFilter())) {
+      renderGroupFeed(feedState);
+      fillGroupFeed(feedState);
+    }
+    return;
+  }
   feed.dataset.signature = signature;
   loadGroupFeed(feed, group);
 }

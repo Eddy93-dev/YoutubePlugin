@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews, parseBrowseVideos, appendChannelPage, feedCutoff, channelsToLoad } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews, parseBrowseVideos, appendChannelPage, feedCutoff, channelsToLoad, sapisidHash } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -322,13 +322,13 @@ test("formatAge and formatViews read like YouTube's cards", () => {
 });
 
 test("parseBrowseVideos reads lockups from a Videos tab page and its continuation token", () => {
-  const lockup = (id, title, age, views, duration) => ({
+  const lockup = (id, title, age, views, duration, overlay = {}) => ({
     richItemRenderer: {
       content: {
         lockupViewModel: {
           contentId: id,
           contentType: "LOCKUP_CONTENT_TYPE_VIDEO",
-          contentImage: { thumbnailViewModel: { overlays: [{ thumbnailBottomOverlayViewModel: { badges: [{ thumbnailBadgeViewModel: { text: duration } }] } }] } },
+          contentImage: { thumbnailViewModel: { overlays: [{ thumbnailBottomOverlayViewModel: { badges: [{ thumbnailBadgeViewModel: { text: duration } }], ...overlay } }] } },
           metadata: { lockupMetadataViewModel: { title: { content: title }, metadata: { contentMetadataViewModel: { metadataRows: [{ metadataParts: [{ text: { content: views } }, { text: { content: age } }] }] } } } },
         },
       },
@@ -337,7 +337,7 @@ test("parseBrowseVideos reads lockups from a Videos tab page and its continuatio
   const json = {
     contents: { richGridRenderer: { contents: [
       lockup("6uYOnnz8o0g", "Flower", "10 days ago", "157K views", "26:07"),
-      lockup("abcdefghijk", "Old stream", "Streamed 2 years ago", "1.2K views", "1:02:03"),
+      lockup("abcdefghijk", "Old stream", "Streamed 2 years ago", "1.2K views", "1:02:03", { progressBar: { thumbnailOverlayProgressBarViewModel: { startPercent: 87 } } }),
       { richItemRenderer: { content: { lockupViewModel: { contentId: "PLx", contentType: "LOCKUP_CONTENT_TYPE_PLAYLIST" } } } },
       { continuationItemRenderer: { continuationEndpoint: { commandExecutorCommand: { commands: [{ continuationCommand: { token: "NEXT" } }] } } } },
     ] } },
@@ -346,8 +346,8 @@ test("parseBrowseVideos reads lockups from a Videos tab page and its continuatio
   };
   assert.deepStrictEqual(parseBrowseVideos(json), {
     videos: [
-      { videoId: "6uYOnnz8o0g", title: "Flower", ageText: "10 days ago", viewsText: "157K views", duration: "26:07" },
-      { videoId: "abcdefghijk", title: "Old stream", ageText: "Streamed 2 years ago", viewsText: "1.2K views", duration: "1:02:03" },
+      { videoId: "6uYOnnz8o0g", title: "Flower", ageText: "10 days ago", viewsText: "157K views", duration: "26:07", watched: null },
+      { videoId: "abcdefghijk", title: "Old stream", ageText: "Streamed 2 years ago", viewsText: "1.2K views", duration: "1:02:03", watched: 87 },
     ],
     token: "NEXT",
   });
@@ -377,4 +377,9 @@ test("feedCutoff shows only what no channel can still beat; channelsToLoad picks
   assert.deepStrictEqual(channelsToLoad([busy, slow, done], 1).map((c) => c.name), ["busy"]);
   assert.strictEqual(feedCutoff([ch("pending", []), slow]), Infinity, "nothing shown until every channel has a page");
   assert.strictEqual(feedCutoff([done]), -Infinity, "all loaded: show everything");
+});
+
+test("sapisidHash matches YouTube's SAPISIDHASH format", async () => {
+  const expected = require("node:crypto").createHash("sha1").update("1700000000 abc123/XYZ https://www.youtube.com").digest("hex");
+  assert.strictEqual(await sapisidHash("abc123/XYZ", "https://www.youtube.com", 1700000000), `SAPISIDHASH 1700000000_${expected}`);
 });

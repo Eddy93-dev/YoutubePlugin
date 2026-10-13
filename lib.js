@@ -344,7 +344,26 @@ function lockupVideo(lockup) {
     ageText: parts.find((t) => parseAgeDays(t) !== null) ?? "",
     viewsText: parts.find((t) => /\bviews?\b/i.test(t)) ?? "",
     duration: findKey(lockup.contentImage, "thumbnailBadgeViewModel")?.text ?? "",
+    watched: watchedPercent(lockup.contentImage),
   };
+}
+
+// The red "watched" bar's percentage, or null. Only in signed-in responses (see sapisidHash). Newer lockups use
+// thumbnailOverlayProgressBarViewModel.startPercent, older renderers thumbnailOverlayResumePlaybackRenderer.
+function watchedPercent(thumbnail) {
+  const value =
+    findKey(thumbnail, "thumbnailOverlayProgressBarViewModel")?.startPercent ??
+    findKey(thumbnail, "thumbnailOverlayResumePlaybackRenderer")?.percentDurationWatched;
+  const percent = Number(value);
+  return value !== undefined && Number.isFinite(percent) ? percent : null;
+}
+
+// Authorization value YouTube's own pages send so its API answers as the signed-in user:
+// "SAPISIDHASH <time>_<sha1 of '<time> <SAPISID cookie> <origin>'>".
+async function sapisidHash(sapisid, origin, nowSeconds) {
+  const digest = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(`${nowSeconds} ${sapisid} ${origin}`));
+  const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `SAPISIDHASH ${nowSeconds}_${hex}`;
 }
 
 // One browse response (first page or continuation) → { videos: [{ videoId, title, ageText, viewsText, duration }],
@@ -582,6 +601,7 @@ if (typeof module !== "undefined") {
     formatViews,
     VIDEOS_TAB_PARAMS,
     parseBrowseVideos,
+    sapisidHash,
     appendChannelPage,
     feedCutoff,
     channelsToLoad,

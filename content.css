@@ -20,8 +20,8 @@ html[dark] {
 
 /* Peek (html[data-yth-peek]) suspends hiding and dimming and outlines what would be filtered instead. */
 html:not([data-yth-peek]) .yth-hidden { display: none !important; }
-html:not([data-yth-peek]) .yth-dimmed { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
-html:not([data-yth-peek]) .yth-dimmed:hover { opacity: 1; filter: none; }
+html:not([data-yth-peek]) :is(.yth-dimmed, .yth-feed-dimmed) { opacity: 0.35; filter: grayscale(1); transition: opacity 0.15s; }
+html:not([data-yth-peek]) :is(.yth-dimmed, .yth-feed-dimmed):hover { opacity: 1; filter: none; }
 html[data-yth-peek] :is(.yth-hidden, .yth-dimmed) {
   outline: 2px dashed #3ea6ff;
   outline-offset: 4px;
@@ -181,6 +181,7 @@ html[data-yth-group-feed] ytd-browse[page-subtype="subscriptions"] #primary > yt
   -webkit-line-clamp: 2;
 }
 .yth-feed-channel:hover { color: var(--yth-fg) !important; }
+.yth-feed-progress { position: absolute; left: 0; bottom: 0; height: 4px; background: #f03; }
 .yth-feed-sentinel { min-height: 1px; padding: 24px 0; color: var(--yth-fg2); text-align: center; }
 .yth-feed-card a:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; border-radius: 4px; }
 
