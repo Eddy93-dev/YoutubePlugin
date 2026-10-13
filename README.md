@@ -18,6 +18,8 @@ Chrome extension (Manifest V3, no build step, no dependencies) that cleans up Yo
 ### Channel groups
 Sort your subscriptions into your own groups (Gaming, Coding, Languages…) instead of scrolling one long list.
 
+<img src="docs/screenshots/group-view.jpg" alt="YouTube in dark theme with a Groups section in the left sidebar (Science, Coding, Languages; Science expanded to Kurzgesagt, Veritasium, NASA and MinutePhysics) and the Science group open as Latest uploads: 64 videos from 4 channels, newest first, with a Science · 4 channels bar and a Show all button">
+
 - **In the sidebar:** groups appear in YouTube's left sidebar, above Subscriptions. Expand a group to see its channels and jump to one; hover a channel there and click × to take it out of the group.
 - **Adding channels:** hover a channel in the sidebar's Subscriptions list and click its folder button, or use the groups button next to Subscribe on a channel page. Both open a small menu with a checkbox per group and a field to create a new one. A channel can be in several groups. Groups can also be created with the sidebar's + button, and managed in settings (rename, reorder, delete, add channels by `@handle` or URL).
 - **Opening a group:** click it in the sidebar. Settings → Channel groups → "Clicking a group shows" picks the view:
@@ -42,13 +44,11 @@ Settings are grouped into collapsible sections; each header shows what's current
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/settings-light.png" width="260" alt="Settings panel in light theme with default settings: hide anything watched past 80% on all pages, no extra filters, no channel groups"></td>
-    <td align="center"><img src="docs/screenshots/settings-dark.png" width="260" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, 3 channel groups, Shorts, shelves and ads hidden, 5 videos per row"></td>
-    <td align="center"><img src="docs/screenshots/settings-groups.png" width="260" alt="Channel groups section in dark theme: Gaming, Coding and Languages groups, Coding expanded with its four channels and a field to add more, and Clicking a group shows set to Latest uploads"></td>
+    <td align="center"><img src="docs/screenshots/settings-dark.png" width="300" alt="Settings panel in dark theme: gray out at 60%, keyword and channel filters, hide videos older than 3 months, 3 channel groups, Shorts, shelves and ads hidden, 5 videos per row"></td>
+    <td align="center"><img src="docs/screenshots/settings-groups.png" width="300" alt="Channel groups section in dark theme: Gaming, Coding and Languages groups, Coding expanded with its four channels and a field to add more, and Clicking a group shows set to Latest uploads"></td>
   </tr>
   <tr>
-    <td align="center">Defaults: hide anything watched past 80%</td>
-    <td align="center">Power setup: gray out at 60%, keyword, channel, age and type filters, 3 channel groups, clean-up, 5 per row</td>
+    <td align="center">Gray out at 60%, keyword, channel, age and type filters, 3 channel groups, clean-up, 5 per row</td>
     <td align="center">Channel groups: manage groups and their channels, choose how a group opens</td>
   </tr>
 </table>
