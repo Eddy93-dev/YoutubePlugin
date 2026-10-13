@@ -22,6 +22,7 @@ const DEFAULTS = {
   hidePlaylists: false,
   hideHomeShelves: false,
   hideSponsored: false,
+  groupView: "filter", // "filter": Subscriptions narrowed to the group; "feed": the group's channels' latest uploads
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
@@ -240,6 +241,7 @@ function sanitizeSetting(key, value, fallback) {
   }
   if (typeof value !== typeof fallback) return undefined;
   if (key === "mode") return value === "hide" || value === "dim" ? value : undefined;
+  if (key === "groupView") return value === "filter" || value === "feed" ? value : undefined;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   return value;
 }
@@ -261,10 +263,75 @@ function cleanAvatar(v) {
   }
 }
 
-// { key, name } plus avatar when one is known.
-function makeChannel(key, name, avatar) {
+const CHANNEL_ID = /^UC[\w-]{22}$/;
+
+// { key, name } plus avatar and id (the UC… channel id, needed for its uploads feed) when known.
+function makeChannel(key, name, avatar, id) {
+  const channel = { key, name };
   const clean = cleanAvatar(avatar);
-  return clean ? { key, name, avatar: clean } : { key, name };
+  if (clean) channel.avatar = clean;
+  if (typeof id === "string" && CHANNEL_ID.test(id)) channel.id = id;
+  return channel;
+}
+
+// Remembers a resolved channel id on that channel in every group.
+function setChannelId(groups, key, id) {
+  const k = normalizeChannel(key);
+  return groups.map((g) => ({
+    ...g,
+    channels: g.channels.map((c) => (normalizeChannel(c.key) === k ? makeChannel(c.key, c.name, c.avatar, id) : c)),
+  }));
+}
+
+// A channel page's own id, from its canonical link.
+function channelIdFromHtml(html) {
+  return html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/)?.[1] ?? null;
+}
+
+const XML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+function decodeXml(text) {
+  return text.replace(/&(#x[\da-f]+|#\d+|\w+);/gi, (m, e) => {
+    if (e[0] !== "#") return XML_ENTITIES[e] ?? m;
+    const code = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+    return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+  });
+}
+
+// A channel's uploads feed (/feeds/videos.xml) → [{ videoId, title, published (ms), author, views, isShort }].
+// Regex-parsed: DOMParser needs TrustedHTML on YouTube, and the feed's format is small and fixed.
+function parseChannelFeed(xml) {
+  const tag = (entry, name) => entry.match(new RegExp(`<${name}>([\\s\\S]*?)</${name}>`))?.[1];
+  return xml
+    .split("<entry>")
+    .slice(1)
+    .map((entry) => ({
+      videoId: tag(entry, "yt:videoId") ?? "",
+      title: decodeXml(tag(entry, "title") ?? ""),
+      published: Date.parse(tag(entry, "published") ?? ""),
+      author: decodeXml(tag(entry, "name") ?? ""),
+      views: Number(entry.match(/<media:statistics views="(\d+)"/)?.[1] ?? NaN),
+      isShort: /<link rel="alternate" href="https:\/\/www\.youtube\.com\/shorts\//.test(entry),
+    }))
+    .filter((v) => VIDEO_ID.test(v.videoId) && Number.isFinite(v.published));
+}
+
+// "3 days ago", like YouTube's cards.
+function formatAge(ms, now) {
+  const seconds = Math.max(0, (now - ms) / 1000);
+  const units = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+  for (const [unit, size] of units) {
+    const n = Math.floor(seconds / size);
+    if (n >= 1) return `${n} ${unit}${n === 1 ? "" : "s"} ago`;
+  }
+  return "just now";
+}
+
+// 82000 → "82K views".
+function formatViews(n) {
+  if (!Number.isFinite(n)) return "";
+  const [value, suffix] = n >= 1e9 ? [n / 1e9, "B"] : n >= 1e6 ? [n / 1e6, "M"] : n >= 1e3 ? [n / 1e3, "K"] : [n, ""];
+  const shown = value < 10 && suffix ? value.toFixed(1).replace(/\.0$/, "") : String(Math.floor(value));
+  return `${shown}${suffix} view${n === 1 ? "" : "s"}`;
 }
 
 // Validates stored or imported groups (may be untrusted): drops malformed entries and duplicates, caps sizes.
@@ -283,7 +350,7 @@ function normalizeGroups(value) {
       const key = cleanText(c?.key).replace(/^@/, "");
       if (!key || keys.has(normalizeChannel(key))) continue;
       keys.add(normalizeChannel(key));
-      channels.push(makeChannel(key, cleanText(c.name) || key, c.avatar));
+      channels.push(makeChannel(key, cleanText(c.name) || key, c.avatar, c.id));
     }
     groups.push({ id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) });
     if (groups.length === MAX_GROUPS) break;
@@ -327,7 +394,7 @@ function setChannelInGroup(groups, id, channel, on) {
     if (!on) return { ...g, channels: rest };
     if (rest.length >= MAX_GROUP_CHANNELS) return g;
     const old = g.channels.find((c) => normalizeChannel(c.key) === normalizeChannel(key));
-    const added = makeChannel(key, cleanText(channel.name) || key, channel.avatar || old?.avatar);
+    const added = makeChannel(key, cleanText(channel.name) || key, channel.avatar || old?.avatar, channel.id || old?.id);
     // Keep its place when it was already in the group.
     return { ...g, channels: old ? g.channels.map((c) => (c === old ? added : c)) : [...rest, added] };
   });
@@ -414,5 +481,10 @@ if (typeof module !== "undefined") {
     setChannelInGroup,
     groupsForChannel,
     groupMatches,
+    setChannelId,
+    channelIdFromHtml,
+    parseChannelFeed,
+    formatAge,
+    formatViews,
   };
 }

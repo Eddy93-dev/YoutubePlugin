@@ -440,7 +440,7 @@ function run() {
     matchesKeyword: compileKeywords(settings.blockedKeywords),
     usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
     onChannelPage: pageKey(location.pathname) === "filterChannel",
-    group: activeGroup(),
+    group: settings.groupView === "feed" ? null : activeGroup(), // the feed view replaces the grid instead
     maxAgeDays: Number(settings.maxAgeDays) || 0,
     hiddenTypes: new Set(
       [

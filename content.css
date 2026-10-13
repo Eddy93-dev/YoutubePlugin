@@ -146,6 +146,43 @@ html[data-yth-peek] #yth-group-bar { top: 116px; } /* below the peek bar */
 .yth-group-empty { margin: 4px 12px; color: var(--yth-fg2); font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .yth-group-toggle svg { transition: none; } }
 
+/* "Latest uploads" group view (group-feed.js) replaces the Subscriptions grid; hiding the grid also stops YouTube
+   from loading more of it. */
+html[data-yth-group-feed] ytd-browse[page-subtype="subscriptions"] #primary > ytd-rich-grid-renderer { display: none !important; }
+#yth-group-feed { padding: 24px; color: var(--yth-fg); font: 400 14px Roboto, Arial, sans-serif; }
+.yth-feed-header { margin: 0 0 16px; }
+.yth-feed-header h2 { margin: 0; font-size: 20px; font-weight: 700; }
+.yth-feed-header p, .yth-feed-empty { margin: 4px 0 0; color: var(--yth-fg2); }
+.yth-feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 32px 16px; }
+.yth-feed-card { min-width: 0; }
+.yth-feed-card a { color: inherit; text-decoration: none; }
+.yth-feed-thumb { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: var(--yth-tint); }
+.yth-feed-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.yth-feed-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+}
+.yth-feed-meta { display: flex; flex-direction: column; gap: 2px; padding: 12px 0 0; color: var(--yth-fg2); }
+.yth-feed-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--yth-fg) !important;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.yth-feed-channel:hover { color: var(--yth-fg) !important; }
+.yth-feed-card a:focus-visible { outline: 2px solid #3ea6ff; outline-offset: 2px; border-radius: 4px; }
+
 /* Folder buttons that open the group picker. */
 .yth-group-pick { display: flex; align-items: center; justify-content: center; border: 0; color: inherit; cursor: pointer; }
 .yth-group-pick svg { width: 20px; height: 20px; fill: currentColor; }

@@ -143,7 +143,13 @@
           <input type="text" id="newGroupName" maxlength="200" placeholder="New group, e.g. Gaming" aria-label="New group name">
           <button type="button" class="btn" id="addGroupBtn">Add</button>
         </div>
-        <p class="hint">Click a group in YouTube's sidebar to see only its channels on Subscriptions.</p>
+        <label for="groupView">Clicking a group shows
+          <select id="groupView" name="groupView">
+            <option value="filter">Subscriptions, filtered</option>
+            <option value="feed">Latest uploads</option>
+          </select>
+        </label>
+        <p class="hint">Click a group in YouTube's sidebar to see only its channels. "Latest uploads" loads each channel's 15 newest videos directly: faster, but without watched filtering.</p>
       </div>
     </details>
 

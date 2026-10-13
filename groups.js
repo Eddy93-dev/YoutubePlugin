@@ -69,9 +69,11 @@ function setActiveGroup(id) {
   scheduleFullPass();
 }
 
-// Same-page navigation through YouTube's own guide link when there is one; a full load otherwise.
+// Same-page navigation by clicking one of YouTube's own links to the same place (guide entries, cards in the
+// Subscriptions grid even while hidden) when there is one; YouTube doesn't route plain links, so a full load otherwise.
 function navigateTo(href) {
-  const link = document.querySelector(`ytd-guide-renderer a#endpoint[href="${CSS.escape(href)}"]`);
+  const ours = `#${GROUPS_SECTION_ID}, #yth-group-feed`;
+  const link = [...document.querySelectorAll(`ytd-app a[href="${CSS.escape(href)}"]`)].find((a) => !a.closest(ours));
   if (link) link.click();
   else location.assign(href);
 }
@@ -397,6 +399,7 @@ function ensureGroupsUI() {
   ensureGuidePickButtons();
   ensureChannelPageButton();
   updateGroupBar();
+  updateGroupFeed();
 }
 
 function saveChannelGroups(next) {

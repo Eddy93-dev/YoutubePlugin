@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -274,4 +274,49 @@ test("channel avatars are kept only from YouTube's image hosts and survive re-ad
   assert.deepStrictEqual(readded[0].channels[0], { key: "One", name: "One renamed", avatar: ok }, "keeps place and avatar");
   const imported = normalizeGroups([{ id: "a", name: "T", channels: [{ key: "x", avatar: "javascript:alert(1)" }, { key: "y", avatar: ok }] }]);
   assert.deepStrictEqual(imported[0].channels, [{ key: "x", name: "x" }, { key: "y", name: "y", avatar: ok }]);
+});
+
+test("parseChannelFeed reads uploads, decodes entities and flags Shorts", () => {
+  const entry = (id, title, link, published, views) => `<entry>
+  <id>yt:video:${id}</id>
+  <yt:videoId>${id}</yt:videoId>
+  <title>${title}</title>
+  <link rel="alternate" href="${link}"/>
+  <author><name>Noclip &amp; Co</name><uri>https://www.youtube.com/channel/UC0fDG3byEcMtbOqPMymDNbw</uri></author>
+  <published>${published}</published>
+  <media:group><media:statistics views="${views}"/></media:group>
+ </entry>`;
+  const xml = `<?xml version="1.0"?><feed><title>Channel</title>${entry("6uYOnnz8o0g", "Flower, Flow &amp; &#39;thatgamecompany&#39;", "https://www.youtube.com/watch?v=6uYOnnz8o0g", "2026-10-02T16:55:37+00:00", 82000)}${entry("abcdefghijk", "A short", "https://www.youtube.com/shorts/abcdefghijk", "2026-10-01T00:00:00+00:00", 5)}${entry("bad", "x", "y", "2026-10-01T00:00:00+00:00", 1)}</feed>`;
+  assert.deepStrictEqual(parseChannelFeed(xml), [
+    { videoId: "6uYOnnz8o0g", title: "Flower, Flow & 'thatgamecompany'", published: Date.parse("2026-10-02T16:55:37Z"), author: "Noclip & Co", views: 82000, isShort: false },
+    { videoId: "abcdefghijk", title: "A short", published: Date.parse("2026-10-01T00:00:00Z"), author: "Noclip & Co", views: 5, isShort: true },
+  ]);
+  assert.deepStrictEqual(parseChannelFeed("<html>not a feed</html>"), []);
+});
+
+test("channelIdFromHtml and setChannelId cache a channel's UC id", () => {
+  const id = "UC0fDG3byEcMtbOqPMymDNbw";
+  assert.strictEqual(channelIdFromHtml(`<head><link rel="canonical" href="https://www.youtube.com/channel/${id}"></head>`), id);
+  assert.strictEqual(channelIdFromHtml("<head></head>"), null);
+  const groups = [
+    { id: "a", name: "A", channels: [{ key: "NoclipDocs", name: "/noclip" }] },
+    { id: "b", name: "B", channels: [{ key: "noclipdocs", name: "/noclip" }, { key: "other", name: "Other" }] },
+  ];
+  const next = setChannelId(groups, "NOCLIPDOCS", id);
+  assert.deepStrictEqual(next.map((g) => g.channels.map((c) => c.id)), [[id], [id, undefined]]);
+  assert.strictEqual(setChannelId(groups, "noclipdocs", "not-an-id")[0].channels[0].id, undefined);
+  assert.strictEqual(normalizeGroups(next)[0].channels[0].id, id, "ids survive normalize (backups)");
+});
+
+test("formatAge and formatViews read like YouTube's cards", () => {
+  const now = Date.parse("2026-10-13T12:00:00Z");
+  assert.strictEqual(formatAge(now - 30 * 1000, now), "just now");
+  assert.strictEqual(formatAge(now - 3600 * 1000, now), "1 hour ago");
+  assert.strictEqual(formatAge(now - 3 * 86400 * 1000, now), "3 days ago");
+  assert.strictEqual(formatAge(now - 400 * 86400 * 1000, now), "1 year ago");
+  assert.strictEqual(formatViews(5), "5 views");
+  assert.strictEqual(formatViews(1), "1 view");
+  assert.strictEqual(formatViews(82000), "82K views");
+  assert.strictEqual(formatViews(1250000), "1.3M views");
+  assert.strictEqual(formatViews(NaN), "");
 });

@@ -92,6 +92,13 @@ function createGroup() {
 document.getElementById("addGroupBtn").addEventListener("click", createGroup);
 newGroupName.addEventListener("keydown", (e) => e.key === "Enter" && createGroup());
 
+// Which view a group opens: a sync setting, saved here because popup.js skips the groups section.
+const groupView = document.getElementById("groupView");
+chrome.storage.sync.get({ groupView: DEFAULTS.groupView }, (s) => {
+  groupView.value = s.groupView;
+});
+groupView.addEventListener("change", () => chrome.storage.sync.set({ groupView: groupView.value }));
+
 chrome.storage.local.get({ groups: [] }, (s) => {
   groups = normalizeGroups(s.groups);
   renderGroups();
