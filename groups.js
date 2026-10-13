@@ -146,7 +146,7 @@ function fillAvatarPlaceholders(section) {
   }
 }
 
-function channelRow(channel, avatars) {
+function channelRow(channel, avatars, group) {
   const href = channelHref(channel.key);
   // Live guide picture first (current), then the one saved when the channel was added.
   const src = lookupAvatar(avatars, channel.key, channel.name) ?? channel.avatar;
@@ -157,7 +157,10 @@ function channelRow(channel, avatars) {
     e.preventDefault();
     navigateTo(href);
   });
-  return link;
+  const remove = h("button", { type: "button", className: "yth-group-remove", textContent: "×", title: `Remove from ${group.name}` });
+  remove.setAttribute("aria-label", `Remove ${channel.name} from ${group.name}`);
+  remove.addEventListener("click", () => saveChannelGroups(setChannelInGroup(channelGroups, group.id, channel, false)));
+  return h("div", { className: "yth-group-channel-row" }, link, remove);
 }
 
 function groupRow(group, avatars) {
@@ -183,7 +186,7 @@ function groupRow(group, avatars) {
   const row = h("div", { className: "yth-group" + (active ? " yth-active" : "") }, h("div", { className: "yth-group-head" }, open, toggle));
   if (expanded) {
     const list = group.channels.length
-      ? group.channels.map((c) => channelRow(c, avatars))
+      ? group.channels.map((c) => channelRow(c, avatars, group))
       : [h("p", { className: "yth-group-empty", textContent: "No channels yet. Use the folder button next to a channel." })];
     row.append(h("div", { className: "yth-group-channels" }, ...list));
   }
