@@ -427,8 +427,7 @@ function applyPageFlags() {
 function run() {
   scheduled = false;
   ensureSettingsButton();
-  ensureGroupsSection();
-  updateGroupBar();
+  ensureGroupsUI();
   applyPageFlags();
   if (settings.hideShorts && location.pathname.startsWith("/shorts/")) {
     location.replace("/");

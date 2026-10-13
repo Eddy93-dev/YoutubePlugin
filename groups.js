@@ -1,5 +1,5 @@
 // Channel groups on YouTube: a "Groups" section in the left guide, and filtering Subscriptions to one group.
-// Shares globals with lib.js, panel.js and content.js (content.js calls ensureGroupsSection / updateGroupBar from run()).
+// Shares globals with lib.js, panel.js and content.js (content.js calls ensureGroupsUI from run()).
 const GROUPS_SECTION_ID = "yth-groups";
 const GROUP_BAR_ID = "yth-group-bar";
 const ACTIVE_GROUP_KEY = "yth-active-group"; // sessionStorage: survives reloads of this tab only
@@ -144,7 +144,7 @@ function groupRow(group, avatars) {
   if (expanded) {
     const list = group.channels.length
       ? group.channels.map((c) => channelRow(c, avatars))
-      : [h("p", { className: "yth-group-empty", textContent: "No channels yet. Add them from the settings panel." })];
+      : [h("p", { className: "yth-group-empty", textContent: "No channels yet. Use the folder button next to a channel." })];
     row.append(h("div", { className: "yth-group-channels" }, ...list));
   }
   return row;
@@ -207,6 +207,142 @@ function updateGroupBar() {
     document.body.append(bar);
   }
   bar.firstChild.textContent = `${group.name} · ${group.channels.length} channel${group.channels.length === 1 ? "" : "s"}`;
+}
+
+// --- Adding channels: a folder button on Subscriptions entries in the guide and on channel pages, both opening
+// a small picker with a checkbox per group. ---
+const PICK_CLASS = "yth-group-pick";
+const CHANNEL_BUTTON_ID = "yth-channel-groups";
+const PICKER_ID = "yth-group-picker";
+const FOLDER_ADD_PATH =
+  "M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z";
+let pickerAnchor = null;
+
+function subscriptionsGuideSection() {
+  return document
+    .querySelector(`ytd-guide-renderer #sections a#endpoint[href="${SUBSCRIPTIONS_PATH}"]`)
+    ?.closest("ytd-guide-section-renderer");
+}
+
+function makePickButton(extraClass, label) {
+  const button = h("button", { type: "button", className: `${PICK_CLASS} ${extraClass}`, title: "Add to group" }, icon(FOLDER_ADD_PATH));
+  button.setAttribute("aria-label", label);
+  return button;
+}
+
+// A folder button on every subscribed channel in the guide (entries appear lazily, e.g. after "Show more").
+function ensureGuidePickButtons() {
+  const section = subscriptionsGuideSection();
+  if (!section) return;
+  for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
+    const href = entry.querySelector("a#endpoint")?.getAttribute("href");
+    if (!href || !CHANNEL_PATH.test(href) || entry.querySelector(`:scope > .${PICK_CLASS}`)) continue;
+    entry.classList.add("yth-guide-channel");
+    entry.append(makePickButton("yth-guide-pick", "Add channel to a group"));
+  }
+}
+
+function currentPageChannel() {
+  const key = channelKey(location.pathname);
+  if (!key) return null; // old /c/ and /user/ URLs: no stable key
+  const name = document.querySelector("#page-header h1")?.textContent.trim() || `@${key}`;
+  return { key, name };
+}
+
+// "Groups" button next to Subscribe on channel pages; its label lists the groups the channel is in.
+function ensureChannelPageButton() {
+  const channel = pageKey(location.pathname) === "filterChannel" ? currentPageChannel() : null;
+  const actions = document.querySelector("#page-header yt-flexible-actions-view-model");
+  if (!channel || !actions) return;
+  let button = document.getElementById(CHANNEL_BUTTON_ID);
+  if (!button) {
+    button = makePickButton("yth-channel-pick", "Channel groups");
+    button.id = CHANNEL_BUTTON_ID;
+    button.append(h("span"));
+  }
+  if (button.parentElement?.parentElement !== actions) actions.append(h("div", { className: "ytFlexibleActionsViewModelAction" }, button));
+  const names = groupsForChannel(channelGroups, channel.key).map((g) => g.name);
+  const label = names.length ? names.join(", ") : "Add to group";
+  if (button.lastChild.textContent !== label) button.lastChild.textContent = label;
+}
+
+function closeGroupPicker() {
+  document.getElementById(PICKER_ID)?.remove();
+  pickerAnchor = null;
+}
+
+function pickerBody(channel) {
+  const inGroups = new Set(groupsForChannel(channelGroups, channel.key).map((g) => g.id));
+  const rows = channelGroups.map((g) => {
+    const box = h("input", { type: "checkbox", checked: inGroups.has(g.id) });
+    box.addEventListener("change", () => saveChannelGroups(setChannelInGroup(channelGroups, g.id, channel, box.checked)));
+    return h("label", {}, box, h("span", { textContent: g.name }));
+  });
+  const input = h("input", { type: "text", placeholder: "New group, then Enter", maxLength: 200 });
+  input.setAttribute("aria-label", "New group name");
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Escape") closeGroupPicker();
+    if (e.key !== "Enter" || !input.value.trim()) return;
+    const id = Date.now().toString(36);
+    saveChannelGroups(setChannelInGroup(addGroup(channelGroups, input.value, id), id, channel, true));
+    openGroupPicker(pickerAnchor, channel); // redraw with the new group ticked
+    document.querySelector(`#${PICKER_ID} input[type="text"]`)?.focus();
+  });
+  return [h("p", { className: "yth-picker-title", textContent: `Add ${channel.name} to` }), ...rows, input];
+}
+
+function openGroupPicker(anchor, channel) {
+  closeGroupPicker();
+  pickerAnchor = anchor;
+  const picker = h("div", { id: PICKER_ID }, ...pickerBody(channel));
+  picker.setAttribute("role", "dialog");
+  picker.setAttribute("aria-label", `Groups for ${channel.name}`);
+  document.body.append(picker);
+  const rect = anchor.getBoundingClientRect();
+  const below = rect.bottom + 6;
+  const top = below + picker.offsetHeight > innerHeight ? Math.max(8, rect.top - picker.offsetHeight - 6) : below;
+  picker.style.top = `${top}px`;
+  picker.style.left = `${Math.max(8, Math.min(rect.left, innerWidth - picker.offsetWidth - 8))}px`;
+  picker.querySelector("input")?.focus();
+}
+
+function channelForPickButton(button) {
+  if (button.id === CHANNEL_BUTTON_ID) return currentPageChannel();
+  const link = button.closest("ytd-guide-entry-renderer")?.querySelector("a#endpoint");
+  const key = link && channelKey(link.getAttribute("href"));
+  return key ? { key, name: link.title || `@${key}` } : null;
+}
+
+// Capture phase, so the guide entry's own link and ripple never see clicks on our button.
+function onPickClick(e) {
+  const button = e.target.closest?.(`.${PICK_CLASS}`);
+  if (!button) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (pickerAnchor === button) return closeGroupPicker();
+  const channel = channelForPickButton(button);
+  if (channel) openGroupPicker(button, channel);
+}
+
+document.addEventListener("click", onPickClick, true);
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (e.target.closest?.(`.${PICK_CLASS}`)) return e.stopPropagation(); // no ripple; click toggles the picker
+    if (pickerAnchor && !e.target.closest?.(`#${PICKER_ID}`)) closeGroupPicker();
+  },
+  true,
+);
+document.addEventListener("keydown", (e) => e.key === "Escape" && pickerAnchor && closeGroupPicker(), true);
+document.addEventListener("yt-navigate-finish", closeGroupPicker);
+
+// Called from content.js run() on every pass.
+function ensureGroupsUI() {
+  ensureGroupsSection();
+  ensureGuidePickButtons();
+  ensureChannelPageButton();
+  updateGroupBar();
 }
 
 function saveChannelGroups(next) {
