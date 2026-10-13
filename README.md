@@ -25,6 +25,7 @@ Sort your subscriptions into your own groups (Gaming, Coding, Languages…) inst
 - **Opening a group:** click it in the sidebar. Settings → Channel groups → "Clicking a group shows" picks the view:
   - **Latest uploads** (recommended): the group's channels' uploads, newest first, with more loading as you scroll. It opens in a couple of seconds. Watched videos are hidden or grayed out by your Watched settings, with YouTube's red watched bar on each card, and manually hidden videos stay hidden. Older videos are ordered by YouTube's "… ago" text, so within the same week, month or year the order across channels is approximate.
   - **Subscriptions, filtered:** YouTube's own Subscriptions feed with every other channel hidden. All your filters apply, but with small groups YouTube keeps loading older pages to fill the screen, so it can be slow.
+- **Keep the main feed for the rest:** tick "Hide from the Subscriptions feed" on a group in settings, and its channels no longer appear in the normal Subscriptions feed. They still show when you open the group, so grouped channels move out of the main feed and into their group.
 - **Storage:** groups are stored on this device and included in backups.
 
 ### Layout and tools

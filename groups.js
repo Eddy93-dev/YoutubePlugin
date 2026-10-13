@@ -62,6 +62,12 @@ function activeGroup() {
   return channelGroups.find((g) => g.id === activeGroupId) ?? null;
 }
 
+// Groups whose channels are left out of the plain Subscriptions feed (not while a group is open there).
+function subscriptionsFeedHiddenGroups() {
+  if (!location.pathname.startsWith(SUBSCRIPTIONS_PATH) || activeGroup()) return [];
+  return channelGroups.filter((g) => g.hideFromFeed && g.channels.length);
+}
+
 function setActiveGroup(id) {
   activeGroupId = id;
   storageSet(sessionStorage, ACTIVE_GROUP_KEY, id);

@@ -178,7 +178,11 @@ function syncHideButton(card, isManual) {
 // Decides one card's state from scratch. ctx holds values that are the same for every card in a pass.
 function processCard(card, ctx) {
   card.classList.remove(...CLASSES);
-  if (ctx.group && !groupMatches(ctx.group, cardChannelIds(card))) {
+  // A group view shows only that group; the plain Subscriptions feed leaves out groups set to hide from it.
+  const outOfView = ctx.group
+    ? !groupMatches(ctx.group, cardChannelIds(card))
+    : ctx.feedHiddenGroups.length > 0 && ctx.feedHiddenGroups.some((g) => groupMatches(g, cardChannelIds(card)));
+  if (outOfView) {
     card.classList.add("yth-group-out");
     return;
   }
@@ -441,6 +445,7 @@ function run() {
     usesChannelLists: settings.allowedChannels.length > 0 || settings.blockedChannels.length > 0,
     onChannelPage: pageKey(location.pathname) === "filterChannel",
     group: settings.groupView === "feed" ? null : activeGroup(), // the feed view replaces the grid instead
+    feedHiddenGroups: subscriptionsFeedHiddenGroups(),
     maxAgeDays: Number(settings.maxAgeDays) || 0,
     hiddenTypes: new Set(
       [

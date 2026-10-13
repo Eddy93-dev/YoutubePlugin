@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews, parseBrowseVideos, appendChannelPage, feedCutoff, channelsToLoad, sapisidHash } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, channelHref, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, setGroupHideFromFeed, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches, setChannelId, channelIdFromHtml, parseChannelFeed, formatAge, formatViews, parseBrowseVideos, appendChannelPage, feedCutoff, channelsToLoad, sapisidHash } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -382,4 +382,15 @@ test("feedCutoff shows only what no channel can still beat; channelsToLoad picks
 test("sapisidHash matches YouTube's SAPISIDHASH format", async () => {
   const expected = require("node:crypto").createHash("sha1").update("1700000000 abc123/XYZ https://www.youtube.com").digest("hex");
   assert.strictEqual(await sapisidHash("abc123/XYZ", "https://www.youtube.com", 1700000000), `SAPISIDHASH 1700000000_${expected}`);
+});
+
+test("setGroupHideFromFeed toggles the flag, other edits keep it, and normalizeGroups validates it", () => {
+  const groups = [{ id: "a", name: "A", channels: [] }, { id: "b", name: "B", channels: [] }];
+  const on = setGroupHideFromFeed(groups, "a", true);
+  assert.deepStrictEqual(on[0], { id: "a", name: "A", channels: [], hideFromFeed: true });
+  assert.strictEqual(groups[0].hideFromFeed, undefined, "no mutation");
+  assert.strictEqual(renameGroup(on, "a", "A2")[0].hideFromFeed, true);
+  assert.strictEqual(setChannelInGroup(on, "a", { key: "x", name: "X" }, true)[0].hideFromFeed, true);
+  assert.deepStrictEqual(setGroupHideFromFeed(on, "a", false)[0], { id: "a", name: "A", channels: [] });
+  assert.deepStrictEqual(normalizeGroups([{ id: "a", name: "A", hideFromFeed: true }, { id: "b", name: "B", hideFromFeed: "yes" }]).map((g) => g.hideFromFeed), [true, undefined]);
 });

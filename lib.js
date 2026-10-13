@@ -465,7 +465,9 @@ function normalizeGroups(value) {
       keys.add(normalizeChannel(key));
       channels.push(makeChannel(key, cleanText(c.name) || key, c.avatar, c.id));
     }
-    groups.push({ id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) });
+    const group = { id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) };
+    if (g.hideFromFeed === true) group.hideFromFeed = true;
+    groups.push(group);
     if (groups.length === MAX_GROUPS) break;
   }
   return groups;
@@ -481,6 +483,15 @@ function addGroup(groups, name, id) {
 function renameGroup(groups, id, name) {
   const clean = cleanText(name);
   return clean ? groups.map((g) => (g.id === id ? { ...g, name: clean } : g)) : groups;
+}
+
+// hideFromFeed: the group's channels are left out of the main Subscriptions feed (they show when the group is opened).
+function setGroupHideFromFeed(groups, id, on) {
+  return groups.map((g) => {
+    if (g.id !== id) return g;
+    const { hideFromFeed, ...rest } = g;
+    return on ? { ...rest, hideFromFeed: true } : rest;
+  });
 }
 
 function deleteGroup(groups, id) {
@@ -589,6 +600,7 @@ if (typeof module !== "undefined") {
     normalizeGroups,
     addGroup,
     renameGroup,
+    setGroupHideFromFeed,
     deleteGroup,
     moveGroup,
     setChannelInGroup,

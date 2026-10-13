@@ -33,7 +33,8 @@ function parseChannelInput(text) {
 function groupItem(group, index) {
   const item = el("details", { className: "group", open: openGroupIds.has(group.id) });
   item.addEventListener("toggle", () => (item.open ? openGroupIds.add(group.id) : openGroupIds.delete(group.id)));
-  item.append(el("summary", {}, group.name, el("span", { className: "group-count", textContent: group.channels.length })));
+  const count = `${group.hideFromFeed ? "hidden from feed · " : ""}${group.channels.length}`;
+  item.append(el("summary", {}, group.name, el("span", { className: "group-count", textContent: count })));
 
   const name = el("input", { type: "text", value: group.name, maxLength: 200 });
   name.setAttribute("aria-label", "Group name");
@@ -71,13 +72,18 @@ function groupItem(group, index) {
   addBtn.addEventListener("click", addChannel);
   add.addEventListener("keydown", (e) => e.key === "Enter" && addChannel());
 
-  item.append(el("div", { className: "row" }, name, up, down, remove), channels, el("div", { className: "row" }, add, addBtn));
+  const hideBox = el("input", { type: "checkbox", checked: Boolean(group.hideFromFeed) });
+  hideBox.addEventListener("change", () => saveGroups(setGroupHideFromFeed(groups, group.id, hideBox.checked)));
+  const hideRow = el("label", { title: "Its videos still show when you open the group" }, hideBox, "Hide from the Subscriptions feed");
+
+  item.append(el("div", { className: "row" }, name, up, down, remove), hideRow, channels, el("div", { className: "row" }, add, addBtn));
   return item;
 }
 
 function renderGroups(focusKey) {
   groupList.replaceChildren(...groups.map(groupItem));
-  setStatus("groups", groups.length ? plural(groups.length, "group") : "None");
+  const hiddenFromFeed = groups.filter((g) => g.hideFromFeed).length;
+  setStatus("groups", groups.length ? `${plural(groups.length, "group")}${hiddenFromFeed ? ` · ${hiddenFromFeed} hidden` : ""}` : "None");
   if (focusKey) groupList.querySelector(`[data-focus="${focusKey}"]`)?.focus();
 }
 
