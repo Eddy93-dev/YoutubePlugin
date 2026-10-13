@@ -295,15 +295,22 @@ function makePickButton(extraClass, label) {
   return button;
 }
 
-// A folder button on every subscribed channel in the guide (entries appear lazily, e.g. after "Show more").
+// Every subscribed channel in the guide (entries appear lazily, e.g. after "Show more") gets a folder button, and
+// is left out of the list when it's in a group and "hide grouped channels" is on.
 function ensureGuidePickButtons() {
   const section = subscriptionsGuideSection();
   if (!section) return;
+  const grouped = settings.hideGroupedInGuide ? channelGroups.flatMap((g) => g.channels.flatMap((c) => [c.key, c.name])) : [];
   for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
-    const href = entry.querySelector("a#endpoint")?.getAttribute("href");
-    if (!href || !CHANNEL_PATH.test(href) || entry.querySelector(`:scope > .${PICK_CLASS}`)) continue;
-    entry.classList.add("yth-guide-channel");
-    entry.append(makePickButton("yth-guide-pick", "Add channel to a group"));
+    const link = entry.querySelector("a#endpoint");
+    const href = link?.getAttribute("href");
+    if (!href || !CHANNEL_PATH.test(href)) continue;
+    if (!entry.querySelector(`:scope > .${PICK_CLASS}`)) {
+      entry.classList.add("yth-guide-channel");
+      entry.append(makePickButton("yth-guide-pick", "Add channel to a group"));
+    }
+    const hide = grouped.length > 0 && channelInList(grouped, [channelKey(href), link.title]);
+    if (entry.classList.contains("yth-guide-grouped") !== hide) entry.classList.toggle("yth-guide-grouped", hide);
   }
 }
 

@@ -98,12 +98,15 @@ function createGroup() {
 document.getElementById("addGroupBtn").addEventListener("click", createGroup);
 newGroupName.addEventListener("keydown", (e) => e.key === "Enter" && createGroup());
 
-// Which view a group opens: a sync setting, saved here because popup.js skips the groups section.
+// Sync settings in this section, saved here because popup.js skips the groups section.
 const groupView = document.getElementById("groupView");
-chrome.storage.sync.get({ groupView: DEFAULTS.groupView }, (s) => {
+const hideGroupedInGuide = document.getElementById("hideGroupedInGuide");
+chrome.storage.sync.get({ groupView: DEFAULTS.groupView, hideGroupedInGuide: DEFAULTS.hideGroupedInGuide }, (s) => {
   groupView.value = s.groupView;
+  hideGroupedInGuide.checked = s.hideGroupedInGuide;
 });
 groupView.addEventListener("change", () => chrome.storage.sync.set({ groupView: groupView.value }));
+hideGroupedInGuide.addEventListener("change", () => chrome.storage.sync.set({ hideGroupedInGuide: hideGroupedInGuide.checked }));
 
 chrome.storage.local.get({ groups: [] }, (s) => {
   groups = normalizeGroups(s.groups);

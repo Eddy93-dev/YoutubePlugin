@@ -194,6 +194,8 @@ html[data-yth-group-feed] ytd-browse[page-subtype="subscriptions"] #primary > yt
 .yth-group-pick { display: flex; align-items: center; justify-content: center; border: 0; color: inherit; cursor: pointer; }
 .yth-group-pick svg { width: 20px; height: 20px; fill: currentColor; }
 .yth-guide-channel { position: relative; }
+/* "Hide grouped channels from the sidebar's Subscriptions list": they're reachable through their group instead. */
+.yth-guide-channel.yth-guide-grouped { display: none !important; }
 .yth-guide-pick {
   position: absolute;
   top: 50%;

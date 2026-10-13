@@ -23,6 +23,7 @@ const DEFAULTS = {
   hideHomeShelves: false,
   hideSponsored: false,
   groupView: "filter", // "filter": Subscriptions narrowed to the group; "feed": the group's channels' latest uploads
+  hideGroupedInGuide: false, // leave grouped channels out of the sidebar's Subscriptions list
 };
 
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
