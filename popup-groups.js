@@ -1,0 +1,105 @@
+// Settings section for channel groups (storage.local "groups"). Loaded after popup.js and uses its helpers.
+const groupList = document.getElementById("groupList");
+const newGroupName = document.getElementById("newGroupName");
+const openGroupIds = new Set();
+let groups = [];
+
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+function saveGroups(next, focusKey) {
+  groups = next;
+  renderGroups(focusKey);
+  chrome.storage.local.set({ groups: next });
+}
+
+// "@handle", "handle", or a pasted channel URL → { key, name }, or null.
+function parseChannelInput(text) {
+  const value = text.trim();
+  if (!value) return null;
+  if (!value.includes("/")) return { key: value, name: value.startsWith("@") ? value : `@${value}` };
+  try {
+    const path = new URL(value, "https://www.youtube.com").pathname;
+    const key = channelKey(path);
+    return key ? { key, name: decodeURIComponent(path.split("/")[1]) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function groupItem(group, index) {
+  const item = el("details", { className: "group", open: openGroupIds.has(group.id) });
+  item.addEventListener("toggle", () => (item.open ? openGroupIds.add(group.id) : openGroupIds.delete(group.id)));
+  item.append(el("summary", {}, group.name, el("span", { className: "group-count", textContent: group.channels.length })));
+
+  const name = el("input", { type: "text", value: group.name, maxLength: 200 });
+  name.setAttribute("aria-label", "Group name");
+  name.addEventListener("change", () => saveGroups(renameGroup(groups, group.id, name.value)));
+  const up = el("button", { type: "button", className: "btn icon", textContent: "↑", title: "Move up", disabled: index === 0 });
+  up.addEventListener("click", () => saveGroups(moveGroup(groups, group.id, -1)));
+  const down = el("button", { type: "button", className: "btn icon", textContent: "↓", title: "Move down", disabled: index === groups.length - 1 });
+  down.addEventListener("click", () => saveGroups(moveGroup(groups, group.id, 1)));
+  // Two clicks to delete: no confirm() dialog, which Chrome may block in the embedded panel.
+  const remove = el("button", { type: "button", className: "btn", textContent: "Delete" });
+  remove.addEventListener("click", () => {
+    if (remove.dataset.armed) return saveGroups(deleteGroup(groups, group.id));
+    remove.dataset.armed = "1";
+    remove.textContent = "Sure?";
+  });
+
+  const channels = el(
+    "ul",
+    { className: "group-channels" },
+    ...group.channels.map((channel) => {
+      const drop = el("button", { type: "button", textContent: "×", title: `Remove ${channel.name}` });
+      drop.addEventListener("click", () => saveGroups(setChannelInGroup(groups, group.id, channel, false)));
+      return el("li", {}, el("span", { textContent: channel.name, title: `@${channel.key}` }), drop);
+    }),
+  );
+
+  const add = el("input", { type: "text", placeholder: "@handle or channel URL" });
+  add.dataset.focus = `${group.id}:add`;
+  add.setAttribute("aria-label", `Add a channel to ${group.name}`);
+  const addBtn = el("button", { type: "button", className: "btn", textContent: "Add" });
+  const addChannel = () => {
+    const channel = parseChannelInput(add.value);
+    if (channel) saveGroups(setChannelInGroup(groups, group.id, channel, true), add.dataset.focus);
+  };
+  addBtn.addEventListener("click", addChannel);
+  add.addEventListener("keydown", (e) => e.key === "Enter" && addChannel());
+
+  item.append(el("div", { className: "row" }, name, up, down, remove), channels, el("div", { className: "row" }, add, addBtn));
+  return item;
+}
+
+function renderGroups(focusKey) {
+  groupList.replaceChildren(...groups.map(groupItem));
+  setStatus("groups", groups.length ? plural(groups.length, "group") : "None");
+  if (focusKey) groupList.querySelector(`[data-focus="${focusKey}"]`)?.focus();
+}
+
+function createGroup() {
+  const name = newGroupName.value.trim();
+  if (!name) return;
+  const id = Date.now().toString(36);
+  openGroupIds.add(id);
+  newGroupName.value = "";
+  saveGroups(addGroup(groups, name, id), `${id}:add`);
+}
+document.getElementById("addGroupBtn").addEventListener("click", createGroup);
+newGroupName.addEventListener("keydown", (e) => e.key === "Enter" && createGroup());
+
+chrome.storage.local.get({ groups: [] }, (s) => {
+  groups = normalizeGroups(s.groups);
+  renderGroups();
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local" || !changes.groups) return;
+  const next = normalizeGroups(changes.groups.newValue);
+  if (JSON.stringify(next) === JSON.stringify(groups)) return; // our own save, already rendered
+  groups = next;
+  renderGroups();
+});

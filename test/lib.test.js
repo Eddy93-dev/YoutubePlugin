@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert");
-const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats } = require("../lib.js");
+const { MANUAL_TTL_MS, normalizeHidden, activeHiddenIds, msUntilNextExpiry, videoIdFromHref, parsePercent, shouldFilter, pageKey, channelKey, parseLines, channelInList, invalidKeywordLines, compileKeywords, parseAgeDays, videoTypes, makeBackup, sanitizeBackup, DEFAULTS, assessHealth, dayKey, mergeStats, summarizeStats, MAX_GROUPS, normalizeGroups, addGroup, renameGroup, deleteGroup, moveGroup, setChannelInGroup, groupsForChannel, groupMatches } = require("../lib.js");
 
 test("dayKey gives local calendar days, counting back across month ends", () => {
   const now = new Date(2026, 2, 1, 12).getTime(); // 1 Mar 2026, local noon
@@ -42,9 +42,9 @@ test("assessHealth flags unrecognized cards, progress bars and masthead", () => 
   assert.deepStrictEqual(assessHealth({ videoLinks: 40, cards: 20, progressLike: 0, progressMatched: 0, mastheadFound: false }), ["masthead"]);
 });
 
-test("backup round-trips settings and manual hides", () => {
+test("backup round-trips settings, manual hides and groups", () => {
   const settings = { ...DEFAULTS, threshold: 65, mode: "dim", blockedKeywords: ["reaction"] };
-  const local = { manuallyHidden: { dQw4w9WgXcQ: 1700000000000 } };
+  const local = { manuallyHidden: { dQw4w9WgXcQ: 1700000000000 }, groups: [{ id: "g1", name: "Coding", channels: [{ key: "fireship", name: "Fireship" }] }] };
   const restored = sanitizeBackup(JSON.parse(JSON.stringify(makeBackup(settings, local, "0.14.0", 0))));
   assert.deepStrictEqual(restored.settings, settings);
   assert.deepStrictEqual(restored.local, local);
@@ -217,4 +217,47 @@ test("channelInList matches handle, id or display name, ignoring case and @", ()
   assert.strictEqual(channelInList(allowed, [null, " cool channel "]), true);
   assert.strictEqual(channelInList(allowed, ["other", "Other Name"]), false);
   assert.strictEqual(channelInList([], ["someone"]), false);
+});
+
+test("group helpers add, rename, move and delete without mutating", () => {
+  const empty = [];
+  let groups = addGroup(empty, "  Gaming ", "a");
+  groups = addGroup(groups, "Coding", "b");
+  assert.deepStrictEqual(empty, []);
+  assert.deepStrictEqual(groups.map((g) => g.name), ["Gaming", "Coding"]);
+  assert.strictEqual(addGroup(groups, "   ", "c"), groups, "blank names are ignored");
+  assert.strictEqual(renameGroup(groups, "a", "Games")[0].name, "Games");
+  assert.strictEqual(renameGroup(groups, "a", "")[0].name, "Gaming");
+  assert.deepStrictEqual(moveGroup(groups, "b", -1).map((g) => g.id), ["b", "a"]);
+  assert.strictEqual(moveGroup(groups, "a", -1), groups, "no-op at the top");
+  assert.deepStrictEqual(deleteGroup(groups, "a").map((g) => g.id), ["b"]);
+  const full = Array.from({ length: MAX_GROUPS }, (_, i) => ({ id: String(i), name: "g", channels: [] }));
+  assert.strictEqual(addGroup(full, "one more", "x"), full);
+});
+
+test("setChannelInGroup adds once, removes, and groupsForChannel/groupMatches find it", () => {
+  let groups = [{ id: "a", name: "Tech", channels: [] }, { id: "b", name: "Fun", channels: [] }];
+  groups = setChannelInGroup(groups, "a", { key: "@LinusTechTips", name: "Linus Tech Tips" }, true);
+  groups = setChannelInGroup(groups, "a", { key: "linustechtips", name: "Linus Tech Tips" }, true);
+  assert.deepStrictEqual(groups[0].channels, [{ key: "linustechtips", name: "Linus Tech Tips" }]);
+  assert.deepStrictEqual(groupsForChannel(groups, "@LinusTechTips").map((g) => g.id), ["a"]);
+  assert.ok(groupMatches(groups[0], ["linustechtips"]));
+  assert.ok(groupMatches(groups[0], ["Linus Tech Tips"]), "matches cards that only show the name");
+  assert.ok(!groupMatches(groups[1], ["linustechtips"]));
+  assert.deepStrictEqual(setChannelInGroup(groups, "a", { key: "linustechtips" }, false)[0].channels, []);
+});
+
+test("normalizeGroups drops malformed entries and duplicates", () => {
+  const groups = normalizeGroups([
+    { id: "a", name: "Ok", channels: [{ key: "@X", name: "X" }, { key: "x" }, { name: "no key" }, null] },
+    { id: "a", name: "Duplicate id", channels: [] },
+    { id: "b", name: "  ", channels: [] },
+    "junk",
+    { id: "c", name: "No channels" },
+  ]);
+  assert.deepStrictEqual(groups, [
+    { id: "a", name: "Ok", channels: [{ key: "x", name: "X" }] },
+    { id: "c", name: "No channels", channels: [] },
+  ]);
+  assert.deepStrictEqual(normalizeGroups({ not: "an array" }), []);
 });

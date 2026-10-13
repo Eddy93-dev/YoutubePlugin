@@ -27,7 +27,8 @@ const DEFAULTS = {
 // chrome.storage.local: can outgrow sync's 8KB-per-item quota. manuallyHidden is { videoId: hiddenAtMs }.
 // health: last layout check from content.js, { problems: string[], page, checkedAt }.
 // stats: per-day filtered videos for the settings panel, see mergeStats.
-const LOCAL_DEFAULTS = { manuallyHidden: {}, health: { problems: [] }, stats: { days: {} } };
+// groups: the user's channel groups, see normalizeGroups.
+const LOCAL_DEFAULTS = { manuallyHidden: {}, health: { problems: [] }, stats: { days: {} }, groups: [] };
 const MANUAL_TTL_MS = 48 * 60 * 60 * 1000;
 
 // v0.5.0 stored a plain array of ids; treat those as hidden now.
@@ -222,6 +223,7 @@ function sanitizeBackup(data) {
       Object.entries(hidden).filter(([id, at]) => VIDEO_ID.test(id) && Number.isFinite(at)),
     );
   }
+  if (Array.isArray(data.local?.groups)) local.groups = normalizeGroups(data.local.groups);
   return { settings, local, skipped };
 }
 
@@ -234,6 +236,85 @@ function sanitizeSetting(key, value, fallback) {
   if (key === "mode") return value === "hide" || value === "dim" ? value : undefined;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
   return value;
+}
+
+// --- Channel groups: [{ id, name, channels: [{ key, name }] }], key = channelKey() of the channel's URL ---
+const MAX_GROUPS = 50;
+const MAX_GROUP_CHANNELS = 500;
+
+const cleanText = (v) => (typeof v === "string" ? v.trim().slice(0, MAX_LINE_LENGTH) : "");
+
+// Validates stored or imported groups (may be untrusted): drops malformed entries and duplicates, caps sizes.
+function normalizeGroups(value) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set();
+  const groups = [];
+  for (const g of value) {
+    const id = cleanText(g?.id);
+    const name = cleanText(g?.name);
+    if (!id || !name || ids.has(id)) continue;
+    ids.add(id);
+    const keys = new Set();
+    const channels = [];
+    for (const c of Array.isArray(g.channels) ? g.channels : []) {
+      const key = normalizeChannel(cleanText(c?.key));
+      if (!key || keys.has(key)) continue;
+      keys.add(key);
+      channels.push({ key, name: cleanText(c.name) || key });
+    }
+    groups.push({ id, name, channels: channels.slice(0, MAX_GROUP_CHANNELS) });
+    if (groups.length === MAX_GROUPS) break;
+  }
+  return groups;
+}
+
+// id is supplied by the caller (e.g. Date.now().toString(36)) so this stays pure.
+function addGroup(groups, name, id) {
+  const clean = cleanText(name);
+  if (!clean || groups.length >= MAX_GROUPS) return groups;
+  return [...groups, { id, name: clean, channels: [] }];
+}
+
+function renameGroup(groups, id, name) {
+  const clean = cleanText(name);
+  return clean ? groups.map((g) => (g.id === id ? { ...g, name: clean } : g)) : groups;
+}
+
+function deleteGroup(groups, id) {
+  return groups.filter((g) => g.id !== id);
+}
+
+// Moves a group one place up (-1) or down (+1); no-op at the ends.
+function moveGroup(groups, id, step) {
+  const from = groups.findIndex((g) => g.id === id);
+  const to = from + step;
+  if (from < 0 || to < 0 || to >= groups.length) return groups;
+  const next = [...groups];
+  [next[from], next[to]] = [next[to], next[from]];
+  return next;
+}
+
+// Adds (on) or removes the channel { key, name } in one group.
+function setChannelInGroup(groups, id, channel, on) {
+  const key = normalizeChannel(channel.key ?? "");
+  if (!key) return groups;
+  return groups.map((g) => {
+    if (g.id !== id) return g;
+    const rest = g.channels.filter((c) => c.key !== key);
+    if (!on) return { ...g, channels: rest };
+    if (rest.length >= MAX_GROUP_CHANNELS) return g;
+    return { ...g, channels: [...rest, { key, name: cleanText(channel.name) || key }] };
+  });
+}
+
+function groupsForChannel(groups, key) {
+  const k = normalizeChannel(key ?? "");
+  return groups.filter((g) => g.channels.some((c) => c.key === k));
+}
+
+// ids: what cardChannelIds() found on a card; matches a channel's handle/id or its display name.
+function groupMatches(group, ids) {
+  return channelInList(group.channels.flatMap((c) => [c.key, c.name]), ids);
 }
 
 // "/pattern/flags" → RegExp (always case-insensitive; g/y dropped since test() with them is stateful), else null.
@@ -297,5 +378,14 @@ if (typeof module !== "undefined") {
     dayKey,
     mergeStats,
     summarizeStats,
+    MAX_GROUPS,
+    normalizeGroups,
+    addGroup,
+    renameGroup,
+    deleteGroup,
+    moveGroup,
+    setChannelInGroup,
+    groupsForChannel,
+    groupMatches,
   };
 }

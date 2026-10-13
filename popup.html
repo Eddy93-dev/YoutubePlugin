@@ -34,7 +34,19 @@
     output { min-width: 3.5em; text-align: right; font-variant-numeric: tabular-nums; }
     textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; resize: vertical; color: inherit; background: var(--field); border: 1px solid var(--border); }
     select { margin-left: auto; font: inherit; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; }
-    #exportBtn, #importBtn { font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 12px; cursor: pointer; }
+    .btn { font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 12px; cursor: pointer; }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .btn.icon { padding: 3px 7px; }
+    input[type="text"] { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: inherit; background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
+
+    /* Channel groups: one collapsible row per group. */
+    details.group { border-top: 1px solid var(--border); }
+    details.group > summary { display: flex; gap: 6px; padding: 6px 2px; cursor: pointer; }
+    .group-count { margin-left: auto; color: var(--muted); font-size: 12px; }
+    .group-channels { list-style: none; margin: 4px 0; padding: 0; }
+    .group-channels li { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+    .group-channels li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .group-channels button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
     .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
     .warn { color: var(--warn); }
     .alert { margin: 0 0 10px; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 6px; font-size: 13px; }
@@ -123,6 +135,18 @@
       </div>
     </details>
 
+    <details class="section" data-section="groups">
+      <summary>Channel groups<span class="status" id="status-groups"></span></summary>
+      <div class="section-body" id="groups">
+        <div id="groupList"></div>
+        <div class="row">
+          <input type="text" id="newGroupName" maxlength="200" placeholder="New group, e.g. Gaming" aria-label="New group name">
+          <button type="button" class="btn" id="addGroupBtn">Add</button>
+        </div>
+        <p class="hint">Click a group in YouTube's sidebar to see only its channels on Subscriptions.</p>
+      </div>
+    </details>
+
     <details class="section" data-section="manual">
       <summary>Manually hidden<span class="status" id="status-manual"></span></summary>
       <div class="section-body">
@@ -168,16 +192,17 @@
         <p class="hint" id="statsReasons"></p>
         <p class="sub">Backup</p>
         <div class="row">
-          <button type="button" id="exportBtn">Export</button>
-          <button type="button" id="importBtn">Import</button>
+          <button type="button" class="btn" id="exportBtn">Export</button>
+          <button type="button" class="btn" id="importBtn">Import</button>
           <input type="file" id="importFile" accept="application/json,.json" hidden>
         </div>
-        <p class="hint" id="backupStatus" role="status">Settings, lists and manually hidden videos, as a JSON file.</p>
+        <p class="hint" id="backupStatus" role="status">Settings, lists, channel groups and manually hidden videos, as a JSON file.</p>
       </div>
     </details>
   </form>
   <footer class="hint" id="version"></footer>
   <script src="lib.js"></script>
   <script src="popup.js"></script>
+  <script src="popup-groups.js"></script>
 </body>
 </html>

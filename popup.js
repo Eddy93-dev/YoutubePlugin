@@ -201,7 +201,12 @@ if (view === "tab") document.body.classList.add("tab-view");
 document.getElementById("exportBtn").addEventListener("click", async () => {
   try {
     const [settings, local] = await Promise.all([chrome.storage.sync.get(DEFAULTS), chrome.storage.local.get(LOCAL_DEFAULTS)]);
-    const backup = makeBackup(settings, { manuallyHidden: local.manuallyHidden }, chrome.runtime.getManifest().version, Date.now());
+    const backup = makeBackup(
+      settings,
+      { manuallyHidden: local.manuallyHidden, groups: local.groups },
+      chrome.runtime.getManifest().version,
+      Date.now(),
+    );
     const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -235,7 +240,8 @@ importFile.addEventListener("change", async () => {
     loadForm(await chrome.storage.sync.get(DEFAULTS));
     const hiddenCount = Object.keys(local.manuallyHidden ?? {}).length;
     const skippedNote = skipped ? ` Skipped ${skipped} invalid value${skipped === 1 ? "" : "s"}.` : "";
-    backupStatus.textContent = `Imported ${Object.keys(settings).length} settings and ${hiddenCount} hidden video${hiddenCount === 1 ? "" : "s"}.${skippedNote}`;
+    const groupNote = local.groups ? `, ${plural(local.groups.length, "group")}` : "";
+    backupStatus.textContent = `Imported ${Object.keys(settings).length} settings${groupNote} and ${hiddenCount} hidden video${hiddenCount === 1 ? "" : "s"}.${skippedNote}`;
   } catch (err) {
     backupStatus.textContent = `Import failed: ${err instanceof SyntaxError ? "the file isn't valid JSON." : err.message}`;
   }
@@ -243,8 +249,9 @@ importFile.addEventListener("change", async () => {
 
 form.addEventListener("input", render);
 // Save on "change" (slider release, textarea blur), not "input": storage.sync caps writes per minute.
+form.addEventListener("submit", (e) => e.preventDefault());
 form.addEventListener("change", (e) => {
-  if (e.target === importFile) return;
+  if (e.target === importFile || e.target.closest("#groups")) return; // groups save themselves, see popup-groups.js
   chrome.storage.sync.set({
     ...Object.fromEntries(CHECKBOXES.map((key) => [key, form[key].checked])),
     threshold: Number(form.threshold.value),
