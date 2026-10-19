@@ -113,6 +113,9 @@ chrome.storage.local.get({ groups: [] }, (s) => {
   renderGroups();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
+  // e.g. a backup import: popup.js's loadForm() doesn't fill this section
+  if (area === "sync" && changes.groupView) groupView.value = changes.groupView.newValue ?? DEFAULTS.groupView;
+  if (area === "sync" && changes.hideGroupedInGuide) hideGroupedInGuide.checked = changes.hideGroupedInGuide.newValue ?? DEFAULTS.hideGroupedInGuide;
   if (area !== "local" || !changes.groups) return;
   const next = normalizeGroups(changes.groups.newValue);
   if (JSON.stringify(next) === JSON.stringify(groups)) return; // our own save, already rendered

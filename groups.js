@@ -300,7 +300,9 @@ function makePickButton(extraClass, label) {
 function ensureGuidePickButtons() {
   const section = subscriptionsGuideSection();
   if (!section) return;
-  const grouped = settings.hideGroupedInGuide ? channelGroups.flatMap((g) => g.channels.flatMap((c) => [c.key, c.name])) : [];
+  const grouped = new Set(
+    settings.hideGroupedInGuide ? channelGroups.flatMap((g) => g.channels.flatMap((c) => [c.key, c.name])).map(normalizeChannel) : [],
+  );
   for (const entry of section.querySelectorAll("ytd-guide-entry-renderer")) {
     const link = entry.querySelector("a#endpoint");
     const href = link?.getAttribute("href");
@@ -309,7 +311,7 @@ function ensureGuidePickButtons() {
       entry.classList.add("yth-guide-channel");
       entry.append(makePickButton("yth-guide-pick", "Add channel to a group"));
     }
-    const hide = grouped.length > 0 && channelInList(grouped, [channelKey(href), link.title]);
+    const hide = [channelKey(href), link.title].some((id) => id && grouped.has(normalizeChannel(id)));
     if (entry.classList.contains("yth-guide-grouped") !== hide) entry.classList.toggle("yth-guide-grouped", hide);
   }
 }
